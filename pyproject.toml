@@ -5,5 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11.4"
 dependencies = [
+    "pillow>=11.2.1",
+    "python-dotenv>=1.1.0",
+    "torch==2.7.1",
     "transformers==4.50.0",
 ]
