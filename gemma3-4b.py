@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # Hugging Faceにログインすれば自動的にデータがダウンロードされる
     pipe = pipeline(
         task="text-generation",
-        model="google/gemma-3-4b-it",
+        model="./gemma-3-4b-it",
         device=device,
         # CPUの場合、Raspberry Pi 5(Cortex-A86 ARMv8.2-A)はfloat16対応。メイン機(i9-9980XE)はbfloat16,float16どちらも対応してない
         # 上は変換の話じゃなくてネイティブ計算の話で、変換はどちらも対応してる
