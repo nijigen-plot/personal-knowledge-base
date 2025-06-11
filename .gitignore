@@ -11,3 +11,6 @@ wheels/
 
 # Credentials
 .env
+
+# Local Model
+gemma-3-4b-it/
