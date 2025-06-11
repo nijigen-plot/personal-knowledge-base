@@ -21,6 +21,7 @@ def main(pipe):
     output = pipe(text_inputs=messages, max_new_tokens=200)
     print(output[0]["generated_text"][-1]["content"])
 
+# loading shardsはpyファイル（プロセス）実行のたびに入るので、いざ使う時は発生しないように対処する
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
