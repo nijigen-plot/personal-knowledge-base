@@ -18,3 +18,14 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 2. Cortex-A76はARM v8.2-Aアーキテクチャで半精度16bitの計算に対応している (https://en.wikipedia.org/wiki/AArch64#ARMv8.2-A)
 3. Intel x86 CPUは4世代Xeonから半精度16bit計算対応で普通の人はまず持ってない (https://zenn.dev/mod_poppo/articles/half-precision-floating-point)
     a. 変換はIvy Bridgeから対応(3世代)
+
+# Benchmarkメモ
+
+## i9-9980XE
+
+- 4b -> 10秒程
+
+## Cortex-A76
+
+- 4b -> 40~50秒
+- 1b -> 40~50秒
