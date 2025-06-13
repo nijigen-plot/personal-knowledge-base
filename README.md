@@ -5,9 +5,11 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 1. install uv
 2. run `uv sync`
 3. get Hugging Face Write access token https://huggingface.co/docs/hub/security-tokens
-4. run `huggingface-cli login`
-5. paste Hugging Face access token
-6. clone repository `git clone https://huggingface.co/google/gemma-3-4b-it` (Need Write Permission Access Token)
+4. install [huggingface-cli](https://huggingface.co/docs/huggingface_hub/main/guides/cli)
+5. run `huggingface-cli login`
+6. paste Hugging Face access token
+7. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
+8. clone repository `git clone https://huggingface.co/google/gemma-3-4b-it` or `git clone git@hf.co:google/gemma-3-4b-it`(Need Write Permission Access Token)
 
 
 # CPUメモ
