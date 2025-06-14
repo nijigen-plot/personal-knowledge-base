@@ -1,10 +1,15 @@
 import time
 
 import torch
-from transformers import pipeline
+from llama_cpp import Llama
 
-
-def main(pipe):
+# loading shardsはpyファイル（プロセス）実行のたびに入るので、いざ使う時は発生しないように対処する
+if __name__ == "__main__":
+    start = time.perf_counter()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    llm = Llama(
+        model_path="./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf",
+        )
     messages = [
         {
             "role": "system",
@@ -17,24 +22,9 @@ def main(pipe):
             ]
         }
     ]
-
-    output = pipe(text_inputs=messages, max_new_tokens=200)
-    print(output[0]["generated_text"][-1]["content"])
-
-# loading shardsはpyファイル（プロセス）実行のたびに入るので、いざ使う時は発生しないように対処する
-if __name__ == "__main__":
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # Hugging Faceにログインすれば自動的にデータがダウンロードされる
-    pipe = pipeline(
-        task="text-generation",
-        model="./gemma-3-1b-it",
-        device=device,
-        # CPUの場合、Raspberry Pi 5(Cortex-A86 ARMv8.2-A)はfloat16対応。メイン機(i9-9980XE)はbfloat16,float16どちらも対応してない
-        # 上は変換の話じゃなくてネイティブ計算の話で、変換はどちらも対応してる
-        torch_dtype="auto"
+    resp = llm.create_chat_completion(
+        messages=messages
     )
-    start = time.perf_counter()
-    main(pipe)
+    print(resp["choices"][0]["message"]["content"])
     end = time.perf_counter() - start
     print(f"処理時間: {end:.2f}秒")
