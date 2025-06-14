@@ -29,7 +29,6 @@ if __name__ == "__main__":
     pipe = pipeline(
         task="text-generation",
         model="./gemma-3-1b-it-unsloth-bnb-4bit",
-        device=device,
         # CPUの場合、Raspberry Pi 5(Cortex-A86 ARMv8.2-A)はfloat16対応。メイン機(i9-9980XE)はbfloat16,float16どちらも対応してない
         # 上は変換の話じゃなくてネイティブ計算の話で、変換はどちらも対応してる
         torch_dtype="auto"
