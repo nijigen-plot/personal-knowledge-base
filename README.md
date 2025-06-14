@@ -21,9 +21,13 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 
 # Benchmarkメモ
 
+4bは簡素で1bは文章量が多いので生成秒数が逆転している
+リアルタイムで描画するようにしたらまた評価かわるかも
+
 ## i9-9980XE
 
 - 4b -> 10秒程
+- 1b -> 30秒程
 
 ## Cortex-A76
 
