@@ -15,3 +15,5 @@ wheels/
 # Local Model
 gemma-3-4b-it/
 gemma-3-1b-it/
+gemma-3-1b-it-unsloth-bnb-4bit/
+gemma-3-1b-it-qat-q4_0-gguf/
