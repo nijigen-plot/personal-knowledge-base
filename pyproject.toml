@@ -5,15 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11.4"
 dependencies = [
-    "accelerate>=1.7.0",
-    "bitsandbytes>=0.46.0",
-    "intel-extension-for-pytorch>=2.7.0",
     "llama-cpp-python>=0.3.9",
     "pillow>=11.2.1",
     "python-dotenv>=1.1.0",
     "torch==2.7.1",
     "transformers==4.50.0",
-    "unsloth>=2024.8",
 ]
 
 [dependency-groups]

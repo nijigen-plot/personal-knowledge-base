@@ -5,8 +5,6 @@ from llama_cpp import Llama
 
 # loading shardsはpyファイル（プロセス）実行のたびに入るので、いざ使う時は発生しないように対処する
 if __name__ == "__main__":
-    start = time.perf_counter()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
     llm = Llama(
         model_path="./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf",
         )
@@ -22,6 +20,7 @@ if __name__ == "__main__":
             ]
         }
     ]
+    start = time.perf_counter()
     resp = llm.create_chat_completion(
         messages=messages
     )
