@@ -45,12 +45,11 @@ def main(stream: bool = True, max_tokens: int = 512):
             message = msg["choices"][0]["delta"]
             if "content" in message:
                 content = message["content"]
-                print(content, end="")
+                print(content, end="", flush=True)
                 partial_message += content
-        logger.info(f"最終的なメッセージ: {partial_message}")
+        print()
     else:
         print(resp["choices"][0]["message"]["content"])
-        logger.info(f"最終的なメッセージ: {resp['choices'][0]['message']['content']}")
     end = time.perf_counter() - start
     logger.info(f"処理時間: {end:.2f}秒")
 
