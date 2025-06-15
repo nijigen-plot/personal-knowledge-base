@@ -33,7 +33,7 @@ def main(stream: bool = True, max_tokens: int = 512):
     llm = Llama(
         model_path="./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf",
         verbose=False,
-        n_ctx=1024,
+        n_ctx=32768,
     )
     start = time.perf_counter()
     resp = llm.create_chat_completion(
