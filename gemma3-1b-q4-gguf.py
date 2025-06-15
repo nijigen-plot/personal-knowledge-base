@@ -32,11 +32,15 @@ def main():
     ]
     llm = Llama(
         model_path="./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf",
-        verbose=False
+        verbose=False,
+        n_ctx=1024,
         )
     start = time.perf_counter()
     resp = llm.create_chat_completion(
-        messages=messages
+        messages=messages,
+        max_tokens=512,
+        stream=False,
+        temperature=0.3
     )
     logger.info(resp["choices"][0]["message"]["content"])
     end = time.perf_counter() - start
