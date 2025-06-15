@@ -1,38 +1,25 @@
-Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
+Raspberry Pi 5で[gemma-3-1b-it-qat-q4_0-gguf](https://huggingface.co/google/gemma-3-1b-it-qat-q4_0-gguf)モデルを動かします
 
-# Setup
+# 動作
 
-1. install uv
-2. run `uv sync`
-3. get Hugging Face Write access token https://huggingface.co/docs/hub/security-tokens
-4. install [huggingface-cli](https://huggingface.co/docs/huggingface_hub/main/guides/cli)
-5. run `huggingface-cli login`
-6. paste Hugging Face access token
-7. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
-8. clone repository `git clone https://huggingface.co/google/gemma-3-4b-it` or `git clone git@hf.co:google/gemma-3-4b-it`(Need Write Permission Access Token)
+こんなかんじ
+
+![20250615_hello.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/635079/12b10e66-5f80-44d9-bece-a79ac362b3aa.gif)
+
+![20250615_qiita_zenn.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/635079/3ef3a1ef-da4a-4728-a250-ad8a3d3fd91e.gif)
 
 
-# CPUメモ
+# Setup & Run
 
-1. Raspberry Pi 5はBCM2712 SoCで、CPUはArm Cortex-A76 (https://eetimes.itmedia.co.jp/ee/articles/2309/28/news177.html)
-2. Cortex-A76はARM v8.2-Aアーキテクチャで半精度16bitの計算に対応している (https://en.wikipedia.org/wiki/AArch64#ARMv8.2-A)
-3. Intel x86 CPUは4世代Xeonから半精度16bit計算対応で普通の人はまず持ってない (https://zenn.dev/mod_poppo/articles/half-precision-floating-point)
-    a. 変換はIvy Bridgeから対応(3世代)
-
-# Benchmarkメモ
-
-4bは簡素で1bは文章量が多いので生成秒数が逆転している
-リアルタイムで描画するようにしたらまた評価かわるかも
-google gemma 3 1b ggufはめっちゃ速い 3~5秒くらい。Raspberry Pi 5なら7秒くらい
-
-## i9-9980XE
-
-- 4b -> 10秒程
-- 1b -> 30秒程
-- 1b gguf -> 3秒程
-## Cortex-A76
-
-- 4b -> 40~50秒
-- 1b -> 40~50秒
-- 1b gguf -> 7秒程
-
+1. [setup raspberry pi 5](https://qiita.com/nijigen_plot/items/5f5299af6aebc54b42d3#raspberry-pi-5-%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97)
+1. install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+1. register [Hugging Face](https://huggingface.co/)
+1. register SSH Key on Hugging Face
+1. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
+1. clone this repository`$ git@github.com:nijigen-plot/personal-knowledge-base.git`
+1. run `uv sync`
+1. `$ cd personal-knowledge-base`
+1. `$ git checkout gemma-3-1b-gguf-with-raspberrypi-5`
+1. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
+1. clone hugging face repository `$ git clone git@hf.co:google/gemma-3-1b-it-qat-q4_0-gguf`
+1. run script `$ uv run python gemma3-1b-q4-gguf.py prompt`
