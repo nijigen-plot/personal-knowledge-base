@@ -4,10 +4,11 @@ Raspberry Pi 5で[gemma-3-1b-it-qat-q4_0-gguf](https://huggingface.co/google/gem
 
 こんなかんじ
 
-![20250615_hello.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/635079/12b10e66-5f80-44d9-bece-a79ac362b3aa.gif)
+![20250615_hello.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/635079/41c0a813-a96a-4591-a2be-278eb3ad85ec.gif)
 
-![20250615_qiita_zenn.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/635079/3ef3a1ef-da4a-4728-a250-ad8a3d3fd91e.gif)
+![20250615_qiita_zenn.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/635079/4612a11e-aa77-4d85-b0a2-5e060448d26d.gif)
 
+![20250615_tokyo.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/635079/053d6586-17c6-4c5d-951a-ebca0df15c06.gif)
 
 # Setup & Run
 
