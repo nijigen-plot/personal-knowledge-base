@@ -23,6 +23,7 @@ def main():
     ]
     llm = Llama(
         model_path="./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf",
+        verbose=False
         )
     start = time.perf_counter()
     resp = llm.create_chat_completion(
