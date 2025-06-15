@@ -7,11 +7,11 @@ from llama_cpp import Llama
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# stream_handler = logging.StreamHandler()
-# stream_handler.setLevel(logging.INFO)
-# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# stream_handler.setFormatter(formatter)
-# logger.addHandler(stream_handler)
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 
 def main(stream: bool = True, max_tokens: int = 512):
