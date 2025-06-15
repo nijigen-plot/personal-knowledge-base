@@ -16,11 +16,10 @@ Raspberry Pi 5で[gemma-3-1b-it-qat-q4_0-gguf](https://huggingface.co/google/gem
 1. register [Hugging Face](https://huggingface.co/)
 1. register SSH Key on Hugging Face
 1. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
-1. clone this repository`$ git@github.com:nijigen-plot/personal-knowledge-base.git`
+1. clone this repository`$ git clone -b gemma-3-1b-gguf-with-raspberrypi-5 git@github.com:nijigen-plot/personal-knowledge-base.git`
 1. run `uv sync`
 1. `$ cd personal-knowledge-base`
 1. run `touch history.txt`
-1. `$ git checkout gemma-3-1b-gguf-with-raspberrypi-5`
 1. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
 1. clone hugging face repository `$ git clone git@hf.co:google/gemma-3-1b-it-qat-q4_0-gguf`
 1. run script `$ uv run python gemma3-1b-q4-gguf.py prompt`
