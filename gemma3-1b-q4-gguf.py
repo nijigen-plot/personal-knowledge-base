@@ -1,8 +1,17 @@
 import argparse
+import logging
 import time
 
 from llama_cpp import Llama
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 def main():
     parser = argparse.ArgumentParser(description="第一引数をプロンプトとしてうけとりAIに問い合わせます")
@@ -29,9 +38,9 @@ def main():
     resp = llm.create_chat_completion(
         messages=messages
     )
-    print(resp["choices"][0]["message"]["content"])
+    logger.info(resp["choices"][0]["message"]["content"])
     end = time.perf_counter() - start
-    print(f"処理時間: {end:.2f}秒")
+    logger.info(f"処理時間: {end:.2f}秒")
 
 # loading shardsはpyファイル（プロセス）実行のたびに入るので、いざ使う時は発生しないように対処する
 if __name__ == "__main__":
