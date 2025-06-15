@@ -48,13 +48,13 @@ def main(stream: bool = True, max_tokens: int = 512, n_ctx: int = 32768):
         {
             "role": "system",
             "content": [
-                {"type": "text", "text": f"あなたは日本語を話すAIアシスタントです。"}
+                {"type": "text", "text": f"あなたは日本語を話すAIアシスタントです。"},
+                {"type": "text", "text": f"以下は過去の会話情報です。必要だと思った場合は活用し、そうでない質問の場合は活用しないでください。\n {memory}"}
             ],
         },
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": memory},
                 {"type": "text", "text": prompt}
             ]
         }
