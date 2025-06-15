@@ -23,15 +23,16 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 
 4bは簡素で1bは文章量が多いので生成秒数が逆転している
 リアルタイムで描画するようにしたらまた評価かわるかも
-1b-4bit unslothのモデルはめっちゃ遅い。370秒掛かった。多分自分の設定が悪い
-google gemma 3 1b ggufはめっちゃ速い 3~5秒くらい
+google gemma 3 1b ggufはめっちゃ速い 3~5秒くらい。Raspberry Pi 5なら7秒くらい
 
 ## i9-9980XE
 
 - 4b -> 10秒程
 - 1b -> 30秒程
-
+- 1b gguf -> 3秒程
 ## Cortex-A76
 
 - 4b -> 40~50秒
 - 1b -> 40~50秒
+- 1b gguf -> 7秒程
+
