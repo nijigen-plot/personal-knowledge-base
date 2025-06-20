@@ -10,6 +10,12 @@ dependencies = [
     "python-dotenv>=1.1.0",
     "torch==2.7.1",
     "transformers==4.50.0",
+    "fastapi>=0.104.1",
+    "uvicorn>=0.24.0",
+    "opensearch-py>=2.4.0",
+    "sentence-transformers>=2.2.2",
+    "pydantic>=2.5.0",
+    "numpy>=1.24.0",
 ]
 
 [dependency-groups]
