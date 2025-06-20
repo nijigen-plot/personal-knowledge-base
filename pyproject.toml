@@ -24,3 +24,8 @@ dev = [
     "huggingface-hub[cli]>=0.32.4",
     "isort>=6.0.1",
 ]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
+]
