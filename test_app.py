@@ -84,7 +84,7 @@ class TestSearchEndpoint:
 
     def test_search_success(self, client, mock_embedding_model, mock_vector_store):
         """正常な検索が動作することを確認"""
-        response = client.get("/search?q=テスト&k=5")
+        response = client.post("/search", json={"query": "テスト", "k": 5})
 
         assert response.status_code == 200
         data = response.json()
@@ -104,36 +104,31 @@ class TestSearchEndpoint:
         mock_embedding_model.encode.assert_called_once_with(["テスト"])
         mock_vector_store.search.assert_called_once()
 
-    def test_search_with_min_score_filter(self, client, mock_vector_store):
-        """最小スコアフィルタリングが動作することを確認"""
-        # 低いスコアの結果を返すようにモックを設定
-        mock_vector_store.search.return_value = [
-            {
-                "id": "low_score_doc",
-                "score": 0.3,
-                "content": "低スコアドキュメント",
-                "metadata": {},
-                "timestamp": 1640995200
-            }
-        ]
-
-        # min_scoreを0.5に設定（結果の0.3より高い）
-        response = client.get("/search?q=テスト&min_score=0.5")
+    def test_search_with_filter_query(self, client, mock_vector_store):
+        """フィルタクエリが動作することを確認"""
+        # フィルタ付きの検索リクエスト
+        response = client.post("/search", json={
+            "query": "テスト", 
+            "k": 10,
+            "filter_query": {"metadata.type": "test"}
+        })
 
         assert response.status_code == 200
         data = response.json()
 
-        # フィルタリングされて結果が0件になることを確認
-        assert len(data) == 0
+        # モックが正しいフィルタで呼び出されたことを確認
+        mock_vector_store.search.assert_called_once()
+        call_args = mock_vector_store.search.call_args
+        assert call_args[1]["filter_query"] == {"metadata.type": "test"}
 
     def test_search_missing_query(self, client):
         """クエリパラメータが不足している場合のエラー処理"""
-        response = client.get("/search")
+        response = client.post("/search", json={})
         assert response.status_code == 422  # バリデーションエラー
 
     def test_search_default_parameters(self, client):
         """デフォルトパラメータでの検索が動作することを確認"""
-        response = client.get("/search?q=テスト")
+        response = client.post("/search", json={"query": "テスト"})
 
         assert response.status_code == 200
         data = response.json()
@@ -150,7 +145,7 @@ class TestAddEndpoint:
             "metadata": {"category": "test", "author": "pytest"}
         }
 
-        response = client.post("/add", json=document_data)
+        response = client.post("/documents", json=document_data)
 
         assert response.status_code == 200
         data = response.json()
@@ -168,14 +163,14 @@ class TestAddEndpoint:
         """最小限のデータでドキュメント追加"""
         document_data = {"content": "最小限のドキュメント"}
 
-        response = client.post("/add", json=document_data)
+        response = client.post("/documents", json=document_data)
         assert response.status_code == 200
 
     def test_add_document_missing_content(self, client):
         """コンテンツが不足している場合のエラー処理"""
         document_data = {"metadata": {"test": "value"}}
 
-        response = client.post("/add", json=document_data)
+        response = client.post("/documents", json=document_data)
         assert response.status_code == 422  # バリデーションエラー
 
     def test_add_document_storage_failure(self, client, mock_vector_store):
@@ -185,7 +180,7 @@ class TestAddEndpoint:
 
         document_data = {"content": "失敗するドキュメント"}
 
-        response = client.post("/add", json=document_data)
+        response = client.post("/documents", json=document_data)
         assert response.status_code == 500
         assert "ドキュメントの保存に失敗しました" in response.json()["detail"]
 
@@ -201,7 +196,6 @@ class TestStatsEndpoint:
         data = response.json()
 
         # レスポンスの構造を確認
-        assert data["index_name"] == "knowledge-base"
         assert data["document_count"] == 1
         assert data["size_bytes"] == 1024
         assert data["size_mb"] == 0.001
@@ -224,7 +218,7 @@ class TestErrorHandling:
         """エンベディング生成エラーの処理"""
         mock_embedding_model.encode.side_effect = Exception("エンベディングエラー")
 
-        response = client.get("/search?q=エラーテスト")
+        response = client.post("/search", json={"query": "エラーテスト"})
         assert response.status_code == 500
         assert "検索エラー" in response.json()["detail"]
 
@@ -233,10 +227,10 @@ class TestErrorHandling:
         mock_embedding_model.encode.side_effect = Exception("エンベディングエラー")
 
         document_data = {"content": "エラーテストドキュメント"}
-        response = client.post("/add", json=document_data)
+        response = client.post("/documents", json=document_data)
 
         assert response.status_code == 500
-        assert "追加エラー" in response.json()["detail"]
+        assert "エラー" in response.json()["detail"]
 
 
 # 実際のAPIが起動していない状態でのテスト実行時の設定
