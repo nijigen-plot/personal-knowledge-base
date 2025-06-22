@@ -27,25 +27,25 @@ class OpenSearchVectorStore:
             ssl_assert_hostname=False,
             ssl_show_warn=False
         )
-        
+
         print(f"OpenSearchクライアント初期化完了: {host}:{port}")
-        
+
         try:
             info = self.client.info()
             print(f"OpenSearch接続確認: {info['version']['number']}")
         except Exception as e:
             print(f"OpenSearch接続エラー: {e}")
             raise
-    
+
     def create_index(self, index_name: str, embedding_dimension: int, force_recreate: bool = False):
-        if self.client.indices.exists(index_name):
+        if self.client.indices.exists(index=index_name):
             if force_recreate:
                 print(f"インデックス削除中: {index_name}")
                 self.client.indices.delete(index_name)
             else:
                 print(f"インデックスは既に存在します: {index_name}")
                 return
-        
+
         index_mapping = {
             "settings": {
                 "index": {
@@ -82,19 +82,19 @@ class OpenSearchVectorStore:
                 }
             }
         }
-        
+
         self.client.indices.create(index_name, body=index_mapping)
         print(f"インデックス作成完了: {index_name}")
-    
-    def add_documents(self, 
-                     index_name: str, 
-                     documents: List[Dict[str, Any]], 
+
+    def add_documents(self,
+                     index_name: str,
+                     documents: List[Dict[str, Any]],
                      embeddings: np.ndarray):
         if len(documents) != len(embeddings):
             raise ValueError("ドキュメント数とembedding数が一致しません")
-        
+
         start_time = time.perf_counter()
-        
+
         actions = []
         for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
             action = {
@@ -107,28 +107,28 @@ class OpenSearchVectorStore:
                 }
             }
             actions.append(action)
-        
+
         success_count, failed_items = helpers.bulk(
             self.client,
             actions,
             chunk_size=100,
             timeout="60s"
         )
-        
+
         end_time = time.perf_counter()
         print(f"ドキュメント追加完了: {success_count}件成功、{end_time - start_time:.2f}秒")
-        
+
         if failed_items:
             print(f"失敗したアイテム: {len(failed_items)}件")
-        
+
         return success_count, failed_items
-    
-    def search(self, 
-               index_name: str, 
-               query_embedding: np.ndarray, 
+
+    def search(self,
+               index_name: str,
+               query_embedding: np.ndarray,
                k: int = 10,
                filter_query: Optional[Dict] = None) -> List[Dict[str, Any]]:
-        
+
         search_body = {
             "size": k,
             "query": {
@@ -143,7 +143,7 @@ class OpenSearchVectorStore:
                 "excludes": ["embedding"]
             }
         }
-        
+
         if filter_query:
             search_body["query"] = {
                 "bool": {
@@ -151,11 +151,11 @@ class OpenSearchVectorStore:
                     "filter": filter_query
                 }
             }
-        
+
         start_time = time.perf_counter()
         response = self.client.search(index=index_name, body=search_body)
         end_time = time.perf_counter()
-        
+
         results = []
         for hit in response["hits"]["hits"]:
             result = {
@@ -166,25 +166,25 @@ class OpenSearchVectorStore:
                 "timestamp": hit["_source"]["timestamp"]
             }
             results.append(result)
-        
+
         print(f"検索完了: {len(results)}件ヒット、{end_time - start_time:.2f}秒")
         return results
-    
+
     def delete_index(self, index_name: str):
         if self.client.indices.exists(index_name):
             self.client.indices.delete(index_name)
             print(f"インデックス削除完了: {index_name}")
         else:
             print(f"インデックスが存在しません: {index_name}")
-    
+
     def get_index_stats(self, index_name: str) -> Dict[str, Any]:
         if not self.client.indices.exists(index_name):
             return {"error": f"インデックスが存在しません: {index_name}"}
-        
+
         stats = self.client.indices.stats(index_name)
         doc_count = stats["indices"][index_name]["total"]["docs"]["count"]
         size_bytes = stats["indices"][index_name]["total"]["store"]["size_in_bytes"]
-        
+
         return {
             "document_count": doc_count,
             "size_bytes": size_bytes,
@@ -210,17 +210,17 @@ if __name__ == "__main__":
         {"content": "二番目のドキュメントです。日本語のテストです。", "metadata": {"type": "test", "id": 2}},
         {"content": "三番目のテストデータです。ベクトル検索の確認用です。", "metadata": {"type": "test", "id": 3}}
     ]
-    
+
     test_embeddings = np.random.random((3, 768)).astype(np.float32)
-    
+
     index_name = "test-knowledge-base"
-    
+
     vector_store.create_index(index_name, 768, force_recreate=True)
     vector_store.add_documents(index_name, test_documents, test_embeddings)
-    
+
     stats = vector_store.get_index_stats(index_name)
     print(f"インデックス統計: {stats}")
-    
+
     query_embedding = np.random.random((1, 768)).astype(np.float32)
     results = vector_store.search(index_name, query_embedding[0], k=2)
     print(f"検索結果: {len(results)}件")
