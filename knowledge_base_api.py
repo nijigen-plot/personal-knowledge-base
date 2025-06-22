@@ -1,15 +1,18 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+import json
+import os
+import time
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List, Optional
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-import json
-import time
-import os
-from contextlib import asynccontextmanager
 
 from embedding_model import PlamoEmbedding
 from opensearch_client import OpenSearchVectorStore
 
+load_dotenv('.env')
 
 class DocumentRequest(BaseModel):
     content: str
@@ -44,29 +47,29 @@ INDEX_NAME = "knowledge-base"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global embedding_model, vector_store
-    
+
     print("ナレッジベースAPIを初期化中...")
-    
-    embedding_model = PlamoEmbedding("pfnet/plamo-embedding-1b")
-    
+
+    embedding_model = PlamoEmbedding("./plamo-embedding-1b")
+
     opensearch_host = os.getenv("OPENSEARCH_HOST", "localhost")
     opensearch_port = int(os.getenv("OPENSEARCH_PORT", "9200"))
     opensearch_user = os.getenv("OPENSEARCH_USER", "admin")
-    opensearch_pass = os.getenv("OPENSEARCH_PASS", "admin")
-    
+    opensearch_pass = os.getenv("OPENSEARCH_INITIAL_ADMIN_PASSWORD", "admin")
+
     vector_store = OpenSearchVectorStore(
         host=opensearch_host,
-        port=opensearch_port,  
+        port=opensearch_port,
         username=opensearch_user,
         password=opensearch_pass
     )
-    
+
     embedding_dim = embedding_model.get_embedding_dimension()
     vector_store.create_index(INDEX_NAME, embedding_dim)
-    
+
     print("ナレッジベースAPI初期化完了")
     yield
-    
+
     print("ナレッジベースAPIをシャットダウン中...")
 
 
@@ -87,31 +90,31 @@ async def root():
 async def add_document(request: DocumentRequest):
     try:
         start_time = time.perf_counter()
-        
+
         embedding = embedding_model.encode([request.content])
-        
+
         document = {
             "content": request.content,
             "metadata": request.metadata
         }
-        
+
         success_count, failed_items = vector_store.add_documents(
-            INDEX_NAME, 
-            [document], 
+            INDEX_NAME,
+            [document],
             embedding
         )
-        
+
         end_time = time.perf_counter()
-        
+
         if failed_items:
             raise HTTPException(status_code=500, detail="ドキュメントの保存に失敗しました")
-        
+
         return {
             "message": "ドキュメントが正常に追加されました",
             "processing_time": round(end_time - start_time, 2),
             "embedding_dimension": embedding.shape[1]
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"エラー: {str(e)}")
 
@@ -120,10 +123,10 @@ async def add_document(request: DocumentRequest):
 async def add_documents_batch(requests: List[DocumentRequest]):
     try:
         start_time = time.perf_counter()
-        
+
         contents = [req.content for req in requests]
         embeddings = embedding_model.encode(contents)
-        
+
         documents = [
             {
                 "content": req.content,
@@ -131,22 +134,22 @@ async def add_documents_batch(requests: List[DocumentRequest]):
             }
             for req in requests
         ]
-        
+
         success_count, failed_items = vector_store.add_documents(
             INDEX_NAME,
             documents,
             embeddings
         )
-        
+
         end_time = time.perf_counter()
-        
+
         return {
             "message": f"{success_count}件のドキュメントが追加されました",
             "success_count": success_count,
             "failed_count": len(failed_items) if failed_items else 0,
             "processing_time": round(end_time - start_time, 2)
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"エラー: {str(e)}")
 
@@ -155,18 +158,18 @@ async def add_documents_batch(requests: List[DocumentRequest]):
 async def search_documents(request: SearchRequest):
     try:
         start_time = time.perf_counter()
-        
+
         query_embedding = embedding_model.encode([request.query])
-        
+
         results = vector_store.search(
             INDEX_NAME,
             query_embedding[0],
             k=request.k,
             filter_query=request.filter_query
         )
-        
+
         end_time = time.perf_counter()
-        
+
         search_results = [
             SearchResult(
                 id=result["id"],
@@ -177,9 +180,9 @@ async def search_documents(request: SearchRequest):
             )
             for result in results
         ]
-        
+
         return search_results
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"検索エラー: {str(e)}")
 
@@ -188,16 +191,16 @@ async def search_documents(request: SearchRequest):
 async def get_index_stats():
     try:
         stats = vector_store.get_index_stats(INDEX_NAME)
-        
+
         if "error" in stats:
             raise HTTPException(status_code=404, detail=stats["error"])
-        
+
         return IndexStats(
             document_count=stats["document_count"],
             size_bytes=stats["size_bytes"],
             size_mb=stats["size_mb"]
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -208,12 +211,12 @@ async def get_index_stats():
 async def reset_index():
     try:
         vector_store.delete_index(INDEX_NAME)
-        
+
         embedding_dim = embedding_model.get_embedding_dimension()
         vector_store.create_index(INDEX_NAME, embedding_dim)
-        
+
         return {"message": "インデックスがリセットされました"}
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"インデックスリセットエラー: {str(e)}")
 
@@ -223,17 +226,17 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         if not file.filename.endswith(('.txt', '.md')):
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="サポートされているファイル形式: .txt, .md"
             )
-        
+
         content = await file.read()
         text_content = content.decode('utf-8')
-        
+
         chunks = []
         lines = text_content.split('\n')
         current_chunk = ""
-        
+
         for line in lines:
             if len(current_chunk) + len(line) < 1000:
                 current_chunk += line + "\n"
@@ -241,15 +244,15 @@ async def upload_file(file: UploadFile = File(...)):
                 if current_chunk.strip():
                     chunks.append(current_chunk.strip())
                 current_chunk = line + "\n"
-        
+
         if current_chunk.strip():
             chunks.append(current_chunk.strip())
-        
+
         if not chunks:
             raise HTTPException(status_code=400, detail="ファイルにテキストが含まれていません")
-        
+
         embeddings = embedding_model.encode(chunks)
-        
+
         documents = [
             {
                 "content": chunk,
@@ -261,13 +264,13 @@ async def upload_file(file: UploadFile = File(...)):
             }
             for i, chunk in enumerate(chunks)
         ]
-        
+
         success_count, failed_items = vector_store.add_documents(
             INDEX_NAME,
             documents,
             embeddings
         )
-        
+
         return {
             "message": f"ファイル '{file.filename}' から {success_count}個のチャンクが追加されました",
             "filename": file.filename,
@@ -275,7 +278,7 @@ async def upload_file(file: UploadFile = File(...)):
             "chunks_saved": success_count,
             "failed_chunks": len(failed_items) if failed_items else 0
         }
-        
+
     except HTTPException:
         raise
     except UnicodeDecodeError:
