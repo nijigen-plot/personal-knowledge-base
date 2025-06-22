@@ -11,13 +11,13 @@ load_dotenv('.env')
 
 class OpenSearchVectorStore:
     def __init__(self,
-                 host: str = "localhost",
-                 port: int = 9200,
-                 username: str = "admin",
-                 password: str = "admin",
-                 use_ssl: bool = True,
-                 verify_certs: bool = False
-                ):
+                host: str = "localhost",
+                port: int = 9200,
+                username: str = "admin",
+                password: str = "admin",
+                use_ssl: bool = True,
+                verify_certs: bool = False
+            ):
 
         self.client = OpenSearch(
             hosts=[{"host": host, "port": port}],
@@ -87,9 +87,9 @@ class OpenSearchVectorStore:
         print(f"インデックス作成完了: {index_name}")
 
     def add_documents(self,
-                     index_name: str,
-                     documents: List[Dict[str, Any]],
-                     embeddings: np.ndarray):
+                    index_name: str,
+                    documents: List[Dict[str, Any]],
+                    embeddings: np.ndarray):
         if len(documents) != len(embeddings):
             raise ValueError("ドキュメント数とembedding数が一致しません")
 
