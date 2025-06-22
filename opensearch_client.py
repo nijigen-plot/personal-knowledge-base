@@ -10,14 +10,15 @@ from opensearchpy import OpenSearch, helpers
 load_dotenv('.env')
 
 class OpenSearchVectorStore:
-    def __init__(self, 
+    def __init__(self,
                  host: str = "localhost",
                  port: int = 9200,
                  username: str = "admin",
                  password: str = "admin",
-                 use_ssl: bool = False,
-                 verify_certs: bool = False):
-        
+                 use_ssl: bool = True,
+                 verify_certs: bool = False
+                ):
+
         self.client = OpenSearch(
             hosts=[{"host": host, "port": port}],
             http_auth=(username, password),
