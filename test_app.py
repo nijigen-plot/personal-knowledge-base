@@ -7,6 +7,7 @@ import numpy as np
 from app import app
 
 
+# fixtureはテストにされる関数で、API連携やDB接続を事事前テストするためのもの。
 @pytest.fixture
 def mock_embedding_model():
     """エンベディングモデルのモック"""
@@ -59,11 +60,14 @@ def client(mock_embedding_model, mock_vector_store):
     # モックをグローバル変数に注入
     with patch('app.embedding_model', mock_embedding_model), \
          patch('app.vector_store', mock_vector_store):
-        
+
+        # TestClientはresponseコードを自動で返す
         with TestClient(test_app) as test_client:
+            # yieldにすることで、テスト後にAPIやDB接続を閉じることができる。今回はFastAPIのTestClientを使っているので、yieldでなくてもいい。
             yield test_client
 
 
+# Testで始まるClass、test_で始まる関数はpytestが自動で検出して実行する。
 class TestRootEndpoint:
     """ルートエンドポイントのテスト"""
     
