@@ -96,7 +96,8 @@ class Gemma3Model:
                 stream: bool = True,
                 max_tokens: int = 512,
                 temperature: float = 0.3,
-                knowledge_context: Optional[str] = None) -> str:
+                knowledge_context: Optional[str] = None,
+                silent: bool = False) -> str:
         """
         テキスト生成
 
@@ -107,6 +108,7 @@ class Gemma3Model:
             max_tokens: 最大トークン数
             temperature: 生成の温度パラメータ
             knowledge_context: ナレッジベースからの追加情報
+            silent: ログ出力を抑制するか（API用）
 
         Returns:
             生成されたテキスト
@@ -140,14 +142,13 @@ class Gemma3Model:
         response_text = ""
 
         if self.model_type == "gguf":
-            response_text = self._generate_gguf(messages, stream, max_tokens, temperature)
+            response_text = self._generate_gguf(messages, stream, max_tokens, temperature, silent)
         else:
-            response_text = self._generate_pytorch(messages, max_tokens)
-            # PyTorchモデルはストリーミング非対応なので常に出力
-            print(response_text)
+            response_text = self._generate_pytorch(messages, max_tokens, silent)
 
         end = time.perf_counter() - start
-        logger.info(f"処理時間: {end:.2f}秒")
+        if not silent:
+            logger.info(f"処理時間: {end:.2f}秒")
 
         # 会話履歴を保存（全モデル対応）
         if use_history:
@@ -155,7 +156,7 @@ class Gemma3Model:
 
         return response_text
 
-    def _generate_gguf(self, messages: List[Dict[str, Any]], stream: bool, max_tokens: int, temperature: float) -> str:
+    def _generate_gguf(self, messages: List[Dict[str, Any]], stream: bool, max_tokens: int, temperature: float, silent: bool = False) -> str:
         """GGUF モデルでテキスト生成"""
         resp = self.model.create_chat_completion(
             messages=messages,
@@ -170,18 +171,24 @@ class Gemma3Model:
                 message = msg["choices"][0]["delta"]
                 if "content" in message:
                     content = message["content"]
-                    print(content, end="", flush=True)
+                    if not silent:
+                        print(content, end="", flush=True)
                     partial_message += content
-            print()
+            if not silent:
+                print()
             return partial_message.strip()
         else:
             content = resp["choices"][0]["message"]["content"]
             return content.strip()
 
-    def _generate_pytorch(self, messages: List[Dict[str, Any]], max_tokens: int) -> str:
+    def _generate_pytorch(self, messages: List[Dict[str, Any]], max_tokens: int, silent: bool = False) -> str:
         """PyTorch モデルでテキスト生成"""
         output = self.model(text_inputs=messages, max_new_tokens=max_tokens)
-        return output[0]["generated_text"][-1]["content"].strip()
+        response_text = output[0]["generated_text"][-1]["content"].strip()
+        # PyTorchモデルはストリーミング非対応なので常に出力（silentでない場合）
+        if not silent:
+            print(response_text)
+        return response_text
 
 
 def main():

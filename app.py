@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from embedding_model import PlamoEmbedding
 from opensearch_client import OpenSearchVectorStore
+from gemma3 import Gemma3Model
 
 load_dotenv('.env')
 
@@ -39,19 +40,38 @@ class IndexStats(BaseModel):
     size_mb: float
 
 
+class LLMRequest(BaseModel):
+    prompt: str
+    use_history: Optional[bool] = True
+    max_tokens: Optional[int] = 512
+    temperature: Optional[float] = 0.3
+    knowledge_context: Optional[str] = None
+
+
+class LLMResponse(BaseModel):
+    prompt: str
+    response: str
+    processing_time: float
+    model_type: str
+    model_size: str
+
+
 embedding_model = None
 vector_store = None
+llm_model = None
 INDEX_NAME = "knowledge-base"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global embedding_model, vector_store
+    global embedding_model, vector_store, llm_model
 
     print("ナレッジベースAPIを初期化中...")
 
+    # Embeddingモデル初期化
     embedding_model = PlamoEmbedding("./plamo-embedding-1b")
 
+    # OpenSearch初期化
     opensearch_host = os.getenv("OPENSEARCH_HOST", "localhost")
     opensearch_port = int(os.getenv("OPENSEARCH_PORT", "9200"))
     opensearch_user = os.getenv("OPENSEARCH_USER", "admin")
@@ -66,6 +86,11 @@ async def lifespan(app: FastAPI):
 
     embedding_dim = embedding_model.get_embedding_dimension()
     vector_store.create_index(INDEX_NAME, embedding_dim)
+
+    # LLMモデル初期化（デフォルト：GGUF）
+    llm_model_type = os.getenv("LLM_MODEL_TYPE", "gguf")
+    llm_model_size = os.getenv("LLM_MODEL_SIZE", "1b")
+    llm_model = Gemma3Model(model_type=llm_model_type, model_size=llm_model_size)
 
     print("ナレッジベースAPI初期化完了")
     yield
@@ -219,6 +244,39 @@ async def reset_index():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"インデックスリセットエラー: {str(e)}")
+
+
+@app.post("/llm", response_model=LLMResponse)
+async def generate_llm_response(request: LLMRequest):
+    """
+    LLMを使用してテキスト生成
+    """
+    try:
+        start_time = time.perf_counter()
+
+        response_text = llm_model.generate(
+            prompt=request.prompt,
+            use_history=request.use_history,
+            stream=True,  # streamはTrueに固定
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            knowledge_context=request.knowledge_context,
+            silent=True  # API用にログ出力を抑制
+        )
+
+        end_time = time.perf_counter() - start_time
+
+        return LLMResponse(
+            prompt=request.prompt,
+            response=response_text,
+            processing_time=round(end_time, 2),
+            model_type=llm_model.model_type,
+            model_size=llm_model.model_size
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM生成エラー: {str(e)}")
+
 
 if __name__ == "__main__":
     import uvicorn

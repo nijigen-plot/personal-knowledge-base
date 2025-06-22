@@ -42,7 +42,17 @@ def mock_vector_store():
 
 
 @pytest.fixture
-def client(mock_embedding_model, mock_vector_store):
+def mock_llm_model():
+    """LLMモデルのモック"""
+    mock_llm = Mock()
+    mock_llm.model_type = "gguf"
+    mock_llm.model_size = "1b"
+    mock_llm.generate.return_value = "これはLLMからのテスト応答です。"
+    return mock_llm
+
+
+@pytest.fixture
+def client(mock_embedding_model, mock_vector_store, mock_llm_model):
     """テスト用のFastAPIクライアント"""
     # テスト用のアプリケーションを作成（lifespanなし）
     from fastapi import FastAPI
@@ -60,7 +70,8 @@ def client(mock_embedding_model, mock_vector_store):
 
     # モックをグローバル変数に注入
     with patch('app.embedding_model', mock_embedding_model), \
-         patch('app.vector_store', mock_vector_store):
+         patch('app.vector_store', mock_vector_store), \
+         patch('app.llm_model', mock_llm_model):
 
         # TestClientはresponseコードを自動で返す
         with TestClient(test_app) as test_client:
@@ -233,12 +244,85 @@ class TestErrorHandling:
         assert "エラー" in response.json()["detail"]
 
 
+class TestLLMEndpoint:
+    """LLMエンドポイントのテスト"""
+
+    def test_llm_generate_success(self, client, mock_llm_model):
+        """正常なLLM生成が動作することを確認"""
+        llm_data = {
+            "prompt": "こんにちは、元気ですか？",
+            "max_tokens": 256,
+            "temperature": 0.5
+        }
+
+        response = client.post("/llm", json=llm_data)
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # レスポンスの構造を確認
+        assert data["prompt"] == "こんにちは、元気ですか？"
+        assert data["response"] == "これはLLMからのテスト応答です。"
+        assert data["model_type"] == "gguf"
+        assert data["model_size"] == "1b"
+        assert "processing_time" in data
+
+        # モックが正しく呼び出されたことを確認
+        mock_llm_model.generate.assert_called_once()
+        call_args = mock_llm_model.generate.call_args
+        assert call_args[1]["prompt"] == "こんにちは、元気ですか？"
+        assert call_args[1]["max_tokens"] == 256
+        assert call_args[1]["temperature"] == 0.5
+        assert call_args[1]["silent"] == True
+
+    def test_llm_generate_with_knowledge_context(self, client, mock_llm_model):
+        """ナレッジコンテキスト付きのLLM生成をテスト"""
+        llm_data = {
+            "prompt": "ナレッジベースについて教えて",
+            "knowledge_context": "ナレッジベースはAIが学習したデータベースです"
+        }
+
+        response = client.post("/llm", json=llm_data)
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # ナレッジコンテキストが正しく渡されたことを確認
+        call_args = mock_llm_model.generate.call_args
+        assert call_args[1]["knowledge_context"] == "ナレッジベースはAIが学習したデータベースです"
+
+    def test_llm_generate_minimal_request(self, client):
+        """最小限のリクエストでLLM生成をテスト"""
+        llm_data = {"prompt": "テスト"}
+
+        response = client.post("/llm", json=llm_data)
+        assert response.status_code == 200
+
+    def test_llm_generate_missing_prompt(self, client):
+        """プロンプトが不足している場合のエラー処理"""
+        llm_data = {"max_tokens": 256}
+
+        response = client.post("/llm", json=llm_data)
+        assert response.status_code == 422  # バリデーションエラー
+
+    def test_llm_generate_error_handling(self, client, mock_llm_model):
+        """LLM生成エラーの処理"""
+        mock_llm_model.generate.side_effect = Exception("LLMエラー")
+
+        llm_data = {"prompt": "エラーテスト"}
+        response = client.post("/llm", json=llm_data)
+
+        assert response.status_code == 500
+        assert "LLM生成エラー" in response.json()["detail"]
+
+
 # 実際のAPIが起動していない状態でのテスト実行時の設定
 @pytest.fixture(autouse=True)
 def mock_global_objects():
     """グローバルオブジェクトのモック（自動適用）"""
     with patch('app.embedding_model') as mock_emb, \
-         patch('app.vector_store') as mock_vec:
+         patch('app.vector_store') as mock_vec, \
+         patch('app.llm_model') as mock_llm:
 
         # デフォルトの動作を設定
         mock_emb.encode.return_value = np.array([[0.1, 0.2, 0.3, 0.4]])
@@ -252,4 +336,8 @@ def mock_global_objects():
             "size_mb": 0.0
         }
 
-        yield mock_emb, mock_vec
+        mock_llm.model_type = "gguf"
+        mock_llm.model_size = "1b"
+        mock_llm.generate.return_value = "デフォルトのLLM応答"
+
+        yield mock_emb, mock_vec, mock_llm
