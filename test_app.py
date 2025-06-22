@@ -244,76 +244,113 @@ class TestErrorHandling:
         assert "エラー" in response.json()["detail"]
 
 
-class TestLLMEndpoint:
-    """LLMエンドポイントのテスト"""
+class TestConversationEndpoint:
+    """会話エンドポイント（RAG）のテスト"""
 
-    def test_llm_generate_success(self, client, mock_llm_model):
-        """正常なLLM生成が動作することを確認"""
-        llm_data = {
-            "prompt": "こんにちは、元気ですか？",
+    def test_conversation_with_rag_success(self, client, mock_embedding_model, mock_vector_store, mock_llm_model):
+        """正常なRAG会話が動作することを確認"""
+        conversation_data = {
+            "question": "ナレッジベースについて教えて",
             "max_tokens": 256,
-            "temperature": 0.5
+            "temperature": 0.5,
+            "search_k": 3,
+            "min_score": 0.7
         }
 
-        response = client.post("/llm", json=llm_data)
+        response = client.post("/conversation", json=conversation_data)
 
         assert response.status_code == 200
         data = response.json()
 
         # レスポンスの構造を確認
-        assert data["prompt"] == "こんにちは、元気ですか？"
-        assert data["response"] == "これはLLMからのテスト応答です。"
+        assert data["question"] == "ナレッジベースについて教えて"
+        assert data["answer"] == "これはLLMからのテスト応答です。"
         assert data["model_type"] == "gguf"
         assert data["model_size"] == "1b"
         assert "processing_time" in data
+        assert "search_results" in data
+        assert data["search_count"] == 1  # mock_vector_storeから1件返される
+        assert data["used_knowledge"] == True
 
-        # モックが正しく呼び出されたことを確認
+        # Embeddingモデルが正しく呼び出されたことを確認
+        mock_embedding_model.encode.assert_called_once_with(["ナレッジベースについて教えて"])
+        
+        # ベクトルストアが正しく呼び出されたことを確認
+        mock_vector_store.search.assert_called_once()
+
+        # LLMが正しく呼び出されたことを確認
         mock_llm_model.generate.assert_called_once()
         call_args = mock_llm_model.generate.call_args
-        assert call_args[1]["prompt"] == "こんにちは、元気ですか？"
+        assert call_args[1]["prompt"] == "ナレッジベースについて教えて"
         assert call_args[1]["max_tokens"] == 256
         assert call_args[1]["temperature"] == 0.5
         assert call_args[1]["silent"] == True
+        # ナレッジコンテキストが生成されていることを確認
+        assert "【参考情報 1】" in call_args[1]["knowledge_context"]
 
-    def test_llm_generate_with_knowledge_context(self, client, mock_llm_model):
-        """ナレッジコンテキスト付きのLLM生成をテスト"""
-        llm_data = {
-            "prompt": "ナレッジベースについて教えて",
-            "knowledge_context": "ナレッジベースはAIが学習したデータベースです"
+    def test_conversation_no_relevant_docs(self, client, mock_vector_store, mock_llm_model):
+        """関連文書が見つからない場合のテスト"""
+        # スコアが低い文書を返すようにモックを設定
+        mock_vector_store.search.return_value = [
+            {
+                "id": "low_score_doc",
+                "score": 0.3,  # min_scoreより低い
+                "content": "関連性の低い文書",
+                "metadata": {},
+                "timestamp": 1640995200
+            }
+        ]
+
+        conversation_data = {
+            "question": "関連性のない質問",
+            "min_score": 0.5
         }
 
-        response = client.post("/llm", json=llm_data)
+        response = client.post("/conversation", json=conversation_data)
 
         assert response.status_code == 200
         data = response.json()
 
-        # ナレッジコンテキストが正しく渡されたことを確認
+        assert data["search_count"] == 0  # フィルタリングされて0件
+        assert data["used_knowledge"] == False
+        
+        # LLMにはナレッジコンテキストが渡されないことを確認
         call_args = mock_llm_model.generate.call_args
-        assert call_args[1]["knowledge_context"] == "ナレッジベースはAIが学習したデータベースです"
+        assert call_args[1]["knowledge_context"] is None
 
-    def test_llm_generate_minimal_request(self, client):
-        """最小限のリクエストでLLM生成をテスト"""
-        llm_data = {"prompt": "テスト"}
+    def test_conversation_minimal_request(self, client):
+        """最小限のリクエストで会話をテスト"""
+        conversation_data = {"question": "テスト質問"}
 
-        response = client.post("/llm", json=llm_data)
+        response = client.post("/conversation", json=conversation_data)
         assert response.status_code == 200
 
-    def test_llm_generate_missing_prompt(self, client):
-        """プロンプトが不足している場合のエラー処理"""
-        llm_data = {"max_tokens": 256}
+    def test_conversation_missing_question(self, client):
+        """質問が不足している場合のエラー処理"""
+        conversation_data = {"max_tokens": 256}
 
-        response = client.post("/llm", json=llm_data)
+        response = client.post("/conversation", json=conversation_data)
         assert response.status_code == 422  # バリデーションエラー
 
-    def test_llm_generate_error_handling(self, client, mock_llm_model):
+    def test_conversation_embedding_error(self, client, mock_embedding_model):
+        """Embeddingエラーの処理"""
+        mock_embedding_model.encode.side_effect = Exception("Embeddingエラー")
+
+        conversation_data = {"question": "エラーテスト"}
+        response = client.post("/conversation", json=conversation_data)
+
+        assert response.status_code == 500
+        assert "会話生成エラー" in response.json()["detail"]
+
+    def test_conversation_llm_error(self, client, mock_llm_model):
         """LLM生成エラーの処理"""
         mock_llm_model.generate.side_effect = Exception("LLMエラー")
 
-        llm_data = {"prompt": "エラーテスト"}
-        response = client.post("/llm", json=llm_data)
+        conversation_data = {"question": "エラーテスト"}
+        response = client.post("/conversation", json=conversation_data)
 
         assert response.status_code == 500
-        assert "LLM生成エラー" in response.json()["detail"]
+        assert "会話生成エラー" in response.json()["detail"]
 
 
 # 実際のAPIが起動していない状態でのテスト実行時の設定

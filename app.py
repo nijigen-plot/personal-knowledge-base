@@ -40,17 +40,21 @@ class IndexStats(BaseModel):
     size_mb: float
 
 
-class LLMRequest(BaseModel):
-    prompt: str
+class ConversationRequest(BaseModel):
+    question: str
     use_history: Optional[bool] = True
     max_tokens: Optional[int] = 512
     temperature: Optional[float] = 0.3
-    knowledge_context: Optional[str] = None
+    search_k: Optional[int] = 5
+    min_score: Optional[float] = 0.5
 
 
-class LLMResponse(BaseModel):
-    prompt: str
-    response: str
+class ConversationResponse(BaseModel):
+    question: str
+    answer: str
+    search_results: List[SearchResult]
+    search_count: int
+    used_knowledge: bool
     processing_time: float
     model_type: str
     model_size: str
@@ -246,36 +250,84 @@ async def reset_index():
         raise HTTPException(status_code=500, detail=f"インデックスリセットエラー: {str(e)}")
 
 
-@app.post("/llm", response_model=LLMResponse)
-async def generate_llm_response(request: LLMRequest):
+@app.post("/conversation", response_model=ConversationResponse)
+async def conversation_with_rag(request: ConversationRequest):
     """
-    LLMを使用してテキスト生成
+    RAGを使用した会話: 質問→Embedding→OpenSearch検索→LLMが回答
     """
     try:
-        start_time = time.perf_counter()
+        total_start_time = time.perf_counter()
 
-        response_text = llm_model.generate(
-            prompt=request.prompt,
+        # 1. 質問をEmbeddingモデルでベクトル化
+        search_start_time = time.perf_counter()
+        query_embedding = embedding_model.encode([request.question])
+
+        # 2. OpenSearchで近傍探索
+        search_results = vector_store.search(
+            INDEX_NAME,
+            query_embedding[0],
+            k=request.search_k
+        )
+
+        # 3. スコアフィルタリング
+        filtered_results = [
+            result for result in search_results 
+            if result.get("score", 0) >= request.min_score
+        ]
+
+        search_end_time = time.perf_counter() - search_start_time
+
+        # 4. 検索結果をナレッジコンテキストとして整形
+        if filtered_results:
+            knowledge_context = "\n\n".join([
+                f"【参考情報 {i+1}】\n{result['content']}"
+                for i, result in enumerate(filtered_results)
+            ])
+            used_knowledge = True
+        else:
+            knowledge_context = None
+            used_knowledge = False
+
+        # 5. LLMで回答生成
+        llm_start_time = time.perf_counter()
+        answer = llm_model.generate(
+            prompt=request.question,
             use_history=request.use_history,
             stream=True,  # streamはTrueに固定
             max_tokens=request.max_tokens,
             temperature=request.temperature,
-            knowledge_context=request.knowledge_context,
+            knowledge_context=knowledge_context,
             silent=True  # API用にログ出力を抑制
         )
+        llm_end_time = time.perf_counter() - llm_start_time
 
-        end_time = time.perf_counter() - start_time
+        total_end_time = time.perf_counter() - total_start_time
 
-        return LLMResponse(
-            prompt=request.prompt,
-            response=response_text,
-            processing_time=round(end_time, 2),
+        # 6. 検索結果をSearchResultモデルに変換
+        search_result_models = [
+            SearchResult(
+                id=result["id"],
+                score=result["score"],
+                content=result["content"],
+                metadata=result["metadata"],
+                timestamp=result["timestamp"]
+            )
+            for result in filtered_results
+        ]
+
+        return ConversationResponse(
+            question=request.question,
+            answer=answer,
+            search_results=search_result_models,
+            search_count=len(filtered_results),
+            used_knowledge=used_knowledge,
+            processing_time=round(total_end_time, 2),
             model_type=llm_model.model_type,
             model_size=llm_model.model_size
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM生成エラー: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"会話生成エラー: {str(e)}")
 
 
 if __name__ == "__main__":
