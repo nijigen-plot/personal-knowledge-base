@@ -212,7 +212,7 @@ if __name__ == "__main__":
     ]
 
     # 固定のベクトルを作成（テスト用）
-    test_vector = np.array([0.1] * 768, dtype=np.float32)
+    test_vector = np.random.random((1, 768)).astype(np.float32).flatten()
     test_embeddings = np.array([test_vector, test_vector * 0.9, test_vector * 0.8])
 
     index_name = "test-knowledge-base"
