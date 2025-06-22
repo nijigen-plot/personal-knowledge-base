@@ -24,7 +24,7 @@ class PlamoEmbedding:
         if self.device == "cpu":
             self.model = self.model.to(self.device)
 
-        self.model.eval()
+        self.model.eval() # モデルを評価モードに設定
         print("PlamoEmbeddingモデルの初期化完了")
 
     def encode(self, texts: Union[str, List[str]], normalize: bool = True) -> np.ndarray:
@@ -32,28 +32,14 @@ class PlamoEmbedding:
             texts = [texts]
 
         start_time = time.perf_counter()
-
-        inputs = self.tokenizer(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt"
-        ).to(self.device)
-
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            embeddings = outputs.last_hidden_state.mean(dim=1)
-
-            if normalize:
-                embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
-
-            embeddings = embeddings.cpu().numpy()
-
+        document_embeddings = self.model.encode_document(
+            sentences=texts,
+            tokenizer=self.tokenizer
+        )
         end_time = time.perf_counter()
         print(f"Embedding生成完了: {len(texts)}件のテキスト、{end_time - start_time:.2f}秒")
 
-        return embeddings
+        return document_embeddings
 
     def get_embedding_dimension(self) -> int:
         return self.model.config.hidden_size
