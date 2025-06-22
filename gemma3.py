@@ -13,11 +13,12 @@ logger.setLevel(logging.INFO)
 
 stream_handler = logging.StreamHandler()
 stream_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 HISTORY_FILE = "history.txt"
+
 
 class Gemma3Model:
     def __init__(self, model_type: str = "gguf", model_size: str = "1b"):
@@ -81,7 +82,9 @@ class Gemma3Model:
             logger.info(f"{HISTORY_FILE} から過去の会話履歴を読み込みました。")
             return memory
         else:
-            logger.info(f"{HISTORY_FILE} が存在しないため、過去の会話履歴は考慮されません。")
+            logger.info(
+                f"{HISTORY_FILE} が存在しないため、過去の会話履歴は考慮されません。"
+            )
             return ""
 
     def _save_memory(self, message: str):
@@ -90,14 +93,16 @@ class Gemma3Model:
             with open(HISTORY_FILE, "a", encoding="utf-8") as f:
                 f.write(message + "\n")
 
-    def generate(self,
-                prompt: str,
-                use_history: bool = True,
-                stream: bool = True,
-                max_tokens: int = 512,
-                temperature: float = 0.3,
-                knowledge_context: Optional[str] = None,
-                silent: bool = False) -> str:
+    def generate(
+        self,
+        prompt: str,
+        use_history: bool = True,
+        stream: bool = True,
+        max_tokens: int = 512,
+        temperature: float = 0.3,
+        knowledge_context: Optional[str] = None,
+        silent: bool = False,
+    ) -> str:
         """
         テキスト生成
 
@@ -116,33 +121,41 @@ class Gemma3Model:
         start = time.perf_counter()
 
         # システムプロンプトの構築
-        system_content = [{"type": "text", "text": "あなたは日本語を話すAIアシスタントです。"}]
+        system_content = [
+            {"type": "text", "text": "あなたは日本語を話すAIアシスタントです。"}
+        ]
 
         # ナレッジベースからの情報を追加
         if knowledge_context:
-            system_content.append({
-                "type": "text",
-                "text": f"以下の情報を参考にして回答してください：\n{knowledge_context}"
-            })
+            system_content.append(
+                {
+                    "type": "text",
+                    "text": f"以下の情報を参考にして回答してください：\n{knowledge_context}",
+                }
+            )
 
         # 会話履歴を追加（全モデル対応）
         if use_history:
             memory = self._load_history()
             if memory:
-                system_content.append({
-                    "type": "text",
-                    "text": f"以下は過去の会話情報です。必要だと思った場合は活用してください：\n{memory}"
-                })
+                system_content.append(
+                    {
+                        "type": "text",
+                        "text": f"以下は過去の会話情報です。必要だと思った場合は活用してください：\n{memory}",
+                    }
+                )
 
         messages = [
             {"role": "system", "content": system_content},
-            {"role": "user", "content": [{"type": "text", "text": prompt}]}
+            {"role": "user", "content": [{"type": "text", "text": prompt}]},
         ]
 
         response_text = ""
 
         if self.model_type == "gguf":
-            response_text = self._generate_gguf(messages, stream, max_tokens, temperature, silent)
+            response_text = self._generate_gguf(
+                messages, stream, max_tokens, temperature, silent
+            )
         else:
             response_text = self._generate_pytorch(messages, max_tokens, silent)
 
@@ -156,13 +169,20 @@ class Gemma3Model:
 
         return response_text
 
-    def _generate_gguf(self, messages: List[Dict[str, Any]], stream: bool, max_tokens: int, temperature: float, silent: bool = False) -> str:
+    def _generate_gguf(
+        self,
+        messages: List[Dict[str, Any]],
+        stream: bool,
+        max_tokens: int,
+        temperature: float,
+        silent: bool = False,
+    ) -> str:
         """GGUF モデルでテキスト生成"""
         resp = self.model.create_chat_completion(
             messages=messages,
             max_tokens=max_tokens,
             stream=stream,
-            temperature=temperature
+            temperature=temperature,
         )
 
         if stream:
@@ -181,7 +201,9 @@ class Gemma3Model:
             content = resp["choices"][0]["message"]["content"]
             return content.strip()
 
-    def _generate_pytorch(self, messages: List[Dict[str, Any]], max_tokens: int, silent: bool = False) -> str:
+    def _generate_pytorch(
+        self, messages: List[Dict[str, Any]], max_tokens: int, silent: bool = False
+    ) -> str:
         """PyTorch モデルでテキスト生成"""
         output = self.model(text_inputs=messages, max_new_tokens=max_tokens)
         response_text = output[0]["generated_text"][-1]["content"].strip()
@@ -193,15 +215,29 @@ class Gemma3Model:
 
 def main():
     parser = argparse.ArgumentParser(description="Gemma3統合AIアシスタント")
-    parser.add_argument("prompt", nargs="?", type=str, help="AIに問い合わせるプロンプト")
-    parser.add_argument("--model-type", choices=["gguf", "pytorch"], default="gguf",
-                       help="使用するモデルタイプ (デフォルト: gguf)")
-    parser.add_argument("--model-size", choices=["1b", "4b"], default="1b",
-                       help="PyTorchモデルのサイズ (デフォルト: 1b)")
-    parser.add_argument("--no-stream", action="store_true", help="ストリーミング出力を無効化")
+    parser.add_argument(
+        "prompt", nargs="?", type=str, help="AIに問い合わせるプロンプト"
+    )
+    parser.add_argument(
+        "--model-type",
+        choices=["gguf", "pytorch"],
+        default="gguf",
+        help="使用するモデルタイプ (デフォルト: gguf)",
+    )
+    parser.add_argument(
+        "--model-size",
+        choices=["1b", "4b"],
+        default="1b",
+        help="PyTorchモデルのサイズ (デフォルト: 1b)",
+    )
+    parser.add_argument(
+        "--no-stream", action="store_true", help="ストリーミング出力を無効化"
+    )
     parser.add_argument("--no-history", action="store_true", help="会話履歴を無効化")
     parser.add_argument("--max-tokens", type=int, default=512, help="最大トークン数")
-    parser.add_argument("--temperature", type=float, default=0.3, help="生成の温度パラメータ")
+    parser.add_argument(
+        "--temperature", type=float, default=0.3, help="生成の温度パラメータ"
+    )
 
     args = parser.parse_args()
 
@@ -217,7 +253,7 @@ def main():
         use_history=not args.no_history,
         stream=not args.no_stream,
         max_tokens=args.max_tokens,
-        temperature=args.temperature
+        temperature=args.temperature,
     )
 
 

@@ -13,7 +13,8 @@ from embedding_model import PlamoEmbedding
 from opensearch_client import OpenSearchVectorStore
 from gemma3 import Gemma3Model
 
-load_dotenv('.env')
+load_dotenv(".env")
+
 
 class DocumentRequest(BaseModel):
     content: str
@@ -85,7 +86,7 @@ async def lifespan(app: FastAPI):
         host=opensearch_host,
         port=opensearch_port,
         username=opensearch_user,
-        password=opensearch_pass
+        password=opensearch_pass,
     )
 
     embedding_dim = embedding_model.get_embedding_dimension()
@@ -106,7 +107,7 @@ app = FastAPI(
     title="ナレッジベースAPI",
     description="PlamoEmbeddingとOpenSearchを使用したドキュメント保存・検索API",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 
@@ -122,26 +123,23 @@ async def add_document(request: DocumentRequest):
 
         embedding = embedding_model.encode([request.content])
 
-        document = {
-            "content": request.content,
-            "metadata": request.metadata
-        }
+        document = {"content": request.content, "metadata": request.metadata}
 
         success_count, failed_items = vector_store.add_documents(
-            INDEX_NAME,
-            [document],
-            embedding
+            INDEX_NAME, [document], embedding
         )
 
         end_time = time.perf_counter()
 
         if failed_items:
-            raise HTTPException(status_code=500, detail="ドキュメントの保存に失敗しました")
+            raise HTTPException(
+                status_code=500, detail="ドキュメントの保存に失敗しました"
+            )
 
         return {
             "message": "ドキュメントが正常に追加されました",
             "processing_time": round(end_time - start_time, 2),
-            "embedding_dimension": embedding.shape[1]
+            "embedding_dimension": embedding.shape[1],
         }
 
     except Exception as e:
@@ -157,17 +155,11 @@ async def add_documents_batch(requests: List[DocumentRequest]):
         embeddings = embedding_model.encode(contents)
 
         documents = [
-            {
-                "content": req.content,
-                "metadata": req.metadata
-            }
-            for req in requests
+            {"content": req.content, "metadata": req.metadata} for req in requests
         ]
 
         success_count, failed_items = vector_store.add_documents(
-            INDEX_NAME,
-            documents,
-            embeddings
+            INDEX_NAME, documents, embeddings
         )
 
         end_time = time.perf_counter()
@@ -176,7 +168,7 @@ async def add_documents_batch(requests: List[DocumentRequest]):
             "message": f"{success_count}件のドキュメントが追加されました",
             "success_count": success_count,
             "failed_count": len(failed_items) if failed_items else 0,
-            "processing_time": round(end_time - start_time, 2)
+            "processing_time": round(end_time - start_time, 2),
         }
 
     except Exception as e:
@@ -194,7 +186,7 @@ async def search_documents(request: SearchRequest):
             INDEX_NAME,
             query_embedding[0],
             k=request.k,
-            filter_query=request.filter_query
+            filter_query=request.filter_query,
         )
 
         end_time = time.perf_counter()
@@ -205,7 +197,7 @@ async def search_documents(request: SearchRequest):
                 score=result["score"],
                 content=result["content"],
                 metadata=result["metadata"],
-                timestamp=result["timestamp"]
+                timestamp=result["timestamp"],
             )
             for result in results
         ]
@@ -227,7 +219,7 @@ async def get_index_stats():
         return IndexStats(
             document_count=stats["document_count"],
             size_bytes=stats["size_bytes"],
-            size_mb=stats["size_mb"]
+            size_mb=stats["size_mb"],
         )
 
     except HTTPException:
@@ -247,7 +239,9 @@ async def reset_index():
         return {"message": "インデックスがリセットされました"}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"インデックスリセットエラー: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"インデックスリセットエラー: {str(e)}"
+        )
 
 
 @app.post("/conversation", response_model=ConversationResponse)
@@ -264,14 +258,13 @@ async def conversation_with_rag(request: ConversationRequest):
 
         # 2. OpenSearchで近傍探索
         search_results = vector_store.search(
-            INDEX_NAME,
-            query_embedding[0],
-            k=request.search_k
+            INDEX_NAME, query_embedding[0], k=request.search_k
         )
 
         # 3. スコアフィルタリング
         filtered_results = [
-            result for result in search_results 
+            result
+            for result in search_results
             if result.get("score", 0) >= request.min_score
         ]
 
@@ -279,10 +272,12 @@ async def conversation_with_rag(request: ConversationRequest):
 
         # 4. 検索結果をナレッジコンテキストとして整形
         if filtered_results:
-            knowledge_context = "\n\n".join([
-                f"【参考情報 {i+1}】\n{result['content']}"
-                for i, result in enumerate(filtered_results)
-            ])
+            knowledge_context = "\n\n".join(
+                [
+                    f"【参考情報 {i+1}】\n{result['content']}"
+                    for i, result in enumerate(filtered_results)
+                ]
+            )
             used_knowledge = True
         else:
             knowledge_context = None
@@ -297,7 +292,7 @@ async def conversation_with_rag(request: ConversationRequest):
             max_tokens=request.max_tokens,
             temperature=request.temperature,
             knowledge_context=knowledge_context,
-            silent=True  # API用にログ出力を抑制
+            silent=True,  # API用にログ出力を抑制
         )
         llm_end_time = time.perf_counter() - llm_start_time
 
@@ -310,7 +305,7 @@ async def conversation_with_rag(request: ConversationRequest):
                 score=result["score"],
                 content=result["content"],
                 metadata=result["metadata"],
-                timestamp=result["timestamp"]
+                timestamp=result["timestamp"],
             )
             for result in filtered_results
         ]
@@ -323,7 +318,7 @@ async def conversation_with_rag(request: ConversationRequest):
             used_knowledge=used_knowledge,
             processing_time=round(total_end_time, 2),
             model_type=llm_model.model_type,
-            model_size=llm_model.model_size
+            model_size=llm_model.model_size,
         )
 
     except Exception as e:
@@ -332,4 +327,5 @@ async def conversation_with_rag(request: ConversationRequest):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

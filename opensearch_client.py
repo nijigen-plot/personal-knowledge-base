@@ -7,17 +7,19 @@ import numpy as np
 from dotenv import load_dotenv
 from opensearchpy import OpenSearch, helpers
 
-load_dotenv('.env')
+load_dotenv(".env")
+
 
 class OpenSearchVectorStore:
-    def __init__(self,
-                host: str = "localhost",
-                port: int = 9200,
-                username: str = "admin",
-                password: str = "admin",
-                use_ssl: bool = True,
-                verify_certs: bool = False
-            ):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 9200,
+        username: str = "admin",
+        password: str = "admin",
+        use_ssl: bool = True,
+        verify_certs: bool = False,
+    ):
 
         self.client = OpenSearch(
             hosts=[{"host": host, "port": port}],
@@ -25,7 +27,7 @@ class OpenSearchVectorStore:
             use_ssl=use_ssl,
             verify_certs=verify_certs,
             ssl_assert_hostname=False,
-            ssl_show_warn=False
+            ssl_show_warn=False,
         )
 
         print(f"OpenSearchクライアント初期化完了: {host}:{port}")
@@ -37,7 +39,9 @@ class OpenSearchVectorStore:
             print(f"OpenSearch接続エラー: {e}")
             raise
 
-    def create_index(self, index_name: str, embedding_dimension: int, force_recreate: bool = False):
+    def create_index(
+        self, index_name: str, embedding_dimension: int, force_recreate: bool = False
+    ):
         if self.client.indices.exists(index=index_name):
             if force_recreate:
                 print(f"インデックス削除中: {index_name}")
@@ -47,18 +51,10 @@ class OpenSearchVectorStore:
                 return
 
         index_mapping = {
-            "settings": {
-                "index": {
-                    "knn": True,
-                    "knn.algo_param.ef_search": 100
-                }
-            },
+            "settings": {"index": {"knn": True, "knn.algo_param.ef_search": 100}},
             "mappings": {
                 "properties": {
-                    "content": {
-                        "type": "text",
-                        "analyzer": "standard"
-                    },
+                    "content": {"type": "text", "analyzer": "standard"},
                     "embedding": {
                         "type": "knn_vector",
                         "dimension": embedding_dimension,
@@ -66,30 +62,21 @@ class OpenSearchVectorStore:
                             "name": "hnsw",
                             "space_type": "cosinesimil",
                             "engine": "faiss",
-                            "parameters": {
-                                "ef_construction": 128,
-                                "m": 24
-                            }
-                        }
+                            "parameters": {"ef_construction": 128, "m": 24},
+                        },
                     },
-                    "metadata": {
-                        "type": "object"
-                    },
-                    "timestamp": {
-                        "type": "date",
-                        "format": "epoch_millis"
-                    }
+                    "metadata": {"type": "object"},
+                    "timestamp": {"type": "date", "format": "epoch_millis"},
                 }
-            }
+            },
         }
 
         self.client.indices.create(index_name, body=index_mapping)
         print(f"インデックス作成完了: {index_name}")
 
-    def add_documents(self,
-                    index_name: str,
-                    documents: List[Dict[str, Any]],
-                    embeddings: np.ndarray):
+    def add_documents(
+        self, index_name: str, documents: List[Dict[str, Any]], embeddings: np.ndarray
+    ):
         if len(documents) != len(embeddings):
             raise ValueError("ドキュメント数とembedding数が一致しません")
 
@@ -103,31 +90,32 @@ class OpenSearchVectorStore:
                     "content": doc.get("content", ""),
                     "embedding": embedding.tolist(),
                     "metadata": doc.get("metadata", {}),
-                    "timestamp": int(time.time() * 1000)
-                }
+                    "timestamp": int(time.time() * 1000),
+                },
             }
             actions.append(action)
 
         success_count, failed_items = helpers.bulk(
-            self.client,
-            actions,
-            chunk_size=100,
-            timeout=60
+            self.client, actions, chunk_size=100, timeout=60
         )
 
         end_time = time.perf_counter()
-        print(f"ドキュメント追加完了: {success_count}件成功、{end_time - start_time:.2f}秒")
+        print(
+            f"ドキュメント追加完了: {success_count}件成功、{end_time - start_time:.2f}秒"
+        )
 
         if failed_items:
             print(f"失敗したアイテム: {len(failed_items)}件")
 
         return success_count, failed_items
 
-    def search(self,
-            index_name: str,
-            query_embedding: np.ndarray,
-            k: int = 10,
-            filter_query: Optional[Dict] = None) -> List[Dict[str, Any]]:
+    def search(
+        self,
+        index_name: str,
+        query_embedding: np.ndarray,
+        k: int = 10,
+        filter_query: Optional[Dict] = None,
+    ) -> List[Dict[str, Any]]:
 
         search_body = {
             "size": k,
@@ -139,17 +127,12 @@ class OpenSearchVectorStore:
                     }
                 }
             },
-            "_source": {
-                "excludes": ["embedding"]
-            }
+            "_source": {"excludes": ["embedding"]},
         }
 
         if filter_query:
             search_body["query"] = {
-                "bool": {
-                    "must": [search_body["query"]],
-                    "filter": filter_query
-                }
+                "bool": {"must": [search_body["query"]], "filter": filter_query}
             }
 
         start_time = time.perf_counter()
@@ -163,7 +146,7 @@ class OpenSearchVectorStore:
                 "score": hit["_score"],
                 "content": hit["_source"]["content"],
                 "metadata": hit["_source"]["metadata"],
-                "timestamp": hit["_source"]["timestamp"]
+                "timestamp": hit["_source"]["timestamp"],
             }
             results.append(result)
 
@@ -188,7 +171,7 @@ class OpenSearchVectorStore:
         return {
             "document_count": doc_count,
             "size_bytes": size_bytes,
-            "size_mb": round(size_bytes / (1024 * 1024), 2)
+            "size_mb": round(size_bytes / (1024 * 1024), 2),
         }
 
 
@@ -202,13 +185,22 @@ if __name__ == "__main__":
         host=opensearch_host,
         port=opensearch_port,
         username=opensearch_user,
-        password=opensearch_pass
+        password=opensearch_pass,
     )
 
     test_documents = [
-        {"content": "これは最初のテストドキュメントです。", "metadata": {"type": "test", "id": 1}},
-        {"content": "二番目のドキュメントです。日本語のテストです。", "metadata": {"type": "test", "id": 2}},
-        {"content": "三番目のテストデータです。ベクトル検索の確認用です。", "metadata": {"type": "test", "id": 3}}
+        {
+            "content": "これは最初のテストドキュメントです。",
+            "metadata": {"type": "test", "id": 1},
+        },
+        {
+            "content": "二番目のドキュメントです。日本語のテストです。",
+            "metadata": {"type": "test", "id": 2},
+        },
+        {
+            "content": "三番目のテストデータです。ベクトル検索の確認用です。",
+            "metadata": {"type": "test", "id": 3},
+        },
     ]
 
     # 固定のベクトルを作成（テスト用）
@@ -235,7 +227,9 @@ if __name__ == "__main__":
     results = vector_store.search(index_name, test_vector, k=3)
     print(f"検索結果: {len(results)}件")
     for i, result in enumerate(results):
-        print(f"  {i+1}. スコア: {result['score']:.6f}, 内容: {result['content'][:30]}...")
+        print(
+            f"  {i+1}. スコア: {result['score']:.6f}, 内容: {result['content'][:30]}..."
+        )
 
     # 少し違うベクトルで検索
     print("\n=== 少し違うベクトルで検索 ===")
@@ -243,4 +237,6 @@ if __name__ == "__main__":
     results2 = vector_store.search(index_name, similar_vector, k=3)
     print(f"検索結果: {len(results2)}件")
     for i, result in enumerate(results2):
-        print(f"  {i+1}. スコア: {result['score']:.6f}, 内容: {result['content'][:30]}...")
+        print(
+            f"  {i+1}. スコア: {result['score']:.6f}, 内容: {result['content'][:30]}..."
+        )

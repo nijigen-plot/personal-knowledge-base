@@ -13,7 +13,9 @@ from app import app
 def mock_embedding_model():
     """エンベディングモデルのモック"""
     mock_model = Mock()
-    mock_model.encode.return_value = np.array([[0.1, 0.2, 0.3, 0.4]])  # 4次元のダミーベクトル
+    mock_model.encode.return_value = np.array(
+        [[0.1, 0.2, 0.3, 0.4]]
+    )  # 4次元のダミーベクトル
     mock_model.get_embedding_dimension.return_value = 4
     return mock_model
 
@@ -30,13 +32,13 @@ def mock_vector_store():
             "score": 0.9,
             "content": "これはテストドキュメントです",
             "metadata": {"type": "test"},
-            "timestamp": 1640995200
+            "timestamp": 1640995200,
         }
     ]
     mock_store.get_index_stats.return_value = {
         "document_count": 1,
         "size_bytes": 1024,
-        "size_mb": 0.001
+        "size_mb": 0.001,
     }
     return mock_store
 
@@ -58,20 +60,25 @@ def client(mock_embedding_model, mock_vector_store, mock_llm_model):
     from fastapi import FastAPI
 
     test_app = FastAPI(
-        title="テスト用ナレッジベースAPI",
-        description="テスト用API",
-        version="1.0.0"
+        title="テスト用ナレッジベースAPI", description="テスト用API", version="1.0.0"
     )
 
     # 元のアプリからルートをコピー
     for route in app.routes:
-        if hasattr(route, 'path') and route.path not in ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc']:
+        if hasattr(route, "path") and route.path not in [
+            "/openapi.json",
+            "/docs",
+            "/docs/oauth2-redirect",
+            "/redoc",
+        ]:
             test_app.routes.append(route)
 
     # モックをグローバル変数に注入
-    with patch('app.embedding_model', mock_embedding_model), \
-         patch('app.vector_store', mock_vector_store), \
-         patch('app.llm_model', mock_llm_model):
+    with (
+        patch("app.embedding_model", mock_embedding_model),
+        patch("app.vector_store", mock_vector_store),
+        patch("app.llm_model", mock_llm_model),
+    ):
 
         # TestClientはresponseコードを自動で返す
         with TestClient(test_app) as test_client:
@@ -118,11 +125,14 @@ class TestSearchEndpoint:
     def test_search_with_filter_query(self, client, mock_vector_store):
         """フィルタクエリが動作することを確認"""
         # フィルタ付きの検索リクエスト
-        response = client.post("/search", json={
-            "query": "テスト", 
-            "k": 10,
-            "filter_query": {"metadata.type": "test"}
-        })
+        response = client.post(
+            "/search",
+            json={
+                "query": "テスト",
+                "k": 10,
+                "filter_query": {"metadata.type": "test"},
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -149,11 +159,13 @@ class TestSearchEndpoint:
 class TestAddEndpoint:
     """ドキュメント追加エンドポイントのテスト"""
 
-    def test_add_document_success(self, client, mock_embedding_model, mock_vector_store):
+    def test_add_document_success(
+        self, client, mock_embedding_model, mock_vector_store
+    ):
         """正常なドキュメント追加が動作することを確認"""
         document_data = {
             "content": "新しいテストドキュメント",
-            "metadata": {"category": "test", "author": "pytest"}
+            "metadata": {"category": "test", "author": "pytest"},
         }
 
         response = client.post("/documents", json=document_data)
@@ -167,7 +179,9 @@ class TestAddEndpoint:
         assert data["embedding_dimension"] == 4
 
         # モックが正しく呼び出されたことを確認
-        mock_embedding_model.encode.assert_called_once_with(["新しいテストドキュメント"])
+        mock_embedding_model.encode.assert_called_once_with(
+            ["新しいテストドキュメント"]
+        )
         mock_vector_store.add_documents.assert_called_once()
 
     def test_add_document_with_minimal_data(self, client):
@@ -216,7 +230,9 @@ class TestStatsEndpoint:
 
     def test_get_stats_index_not_found(self, client, mock_vector_store):
         """インデックスが見つからない場合のエラー処理"""
-        mock_vector_store.get_index_stats.return_value = {"error": "インデックスが見つかりません"}
+        mock_vector_store.get_index_stats.return_value = {
+            "error": "インデックスが見つかりません"
+        }
 
         response = client.get("/stats")
         assert response.status_code == 404
@@ -247,14 +263,16 @@ class TestErrorHandling:
 class TestConversationEndpoint:
     """会話エンドポイント（RAG）のテスト"""
 
-    def test_conversation_with_rag_success(self, client, mock_embedding_model, mock_vector_store, mock_llm_model):
+    def test_conversation_with_rag_success(
+        self, client, mock_embedding_model, mock_vector_store, mock_llm_model
+    ):
         """正常なRAG会話が動作することを確認"""
         conversation_data = {
             "question": "ナレッジベースについて教えて",
             "max_tokens": 256,
             "temperature": 0.5,
             "search_k": 3,
-            "min_score": 0.7
+            "min_score": 0.7,
         }
 
         response = client.post("/conversation", json=conversation_data)
@@ -273,8 +291,10 @@ class TestConversationEndpoint:
         assert data["used_knowledge"] == True
 
         # Embeddingモデルが正しく呼び出されたことを確認
-        mock_embedding_model.encode.assert_called_once_with(["ナレッジベースについて教えて"])
-        
+        mock_embedding_model.encode.assert_called_once_with(
+            ["ナレッジベースについて教えて"]
+        )
+
         # ベクトルストアが正しく呼び出されたことを確認
         mock_vector_store.search.assert_called_once()
 
@@ -288,7 +308,9 @@ class TestConversationEndpoint:
         # ナレッジコンテキストが生成されていることを確認
         assert "【参考情報 1】" in call_args[1]["knowledge_context"]
 
-    def test_conversation_no_relevant_docs(self, client, mock_vector_store, mock_llm_model):
+    def test_conversation_no_relevant_docs(
+        self, client, mock_vector_store, mock_llm_model
+    ):
         """関連文書が見つからない場合のテスト"""
         # スコアが低い文書を返すようにモックを設定
         mock_vector_store.search.return_value = [
@@ -297,14 +319,11 @@ class TestConversationEndpoint:
                 "score": 0.3,  # min_scoreより低い
                 "content": "関連性の低い文書",
                 "metadata": {},
-                "timestamp": 1640995200
+                "timestamp": 1640995200,
             }
         ]
 
-        conversation_data = {
-            "question": "関連性のない質問",
-            "min_score": 0.5
-        }
+        conversation_data = {"question": "関連性のない質問", "min_score": 0.5}
 
         response = client.post("/conversation", json=conversation_data)
 
@@ -313,7 +332,7 @@ class TestConversationEndpoint:
 
         assert data["search_count"] == 0  # フィルタリングされて0件
         assert data["used_knowledge"] == False
-        
+
         # LLMにはナレッジコンテキストが渡されないことを確認
         call_args = mock_llm_model.generate.call_args
         assert call_args[1]["knowledge_context"] is None
@@ -357,9 +376,11 @@ class TestConversationEndpoint:
 @pytest.fixture(autouse=True)
 def mock_global_objects():
     """グローバルオブジェクトのモック（自動適用）"""
-    with patch('app.embedding_model') as mock_emb, \
-         patch('app.vector_store') as mock_vec, \
-         patch('app.llm_model') as mock_llm:
+    with (
+        patch("app.embedding_model") as mock_emb,
+        patch("app.vector_store") as mock_vec,
+        patch("app.llm_model") as mock_llm,
+    ):
 
         # デフォルトの動作を設定
         mock_emb.encode.return_value = np.array([[0.1, 0.2, 0.3, 0.4]])
@@ -370,7 +391,7 @@ def mock_global_objects():
         mock_vec.get_index_stats.return_value = {
             "document_count": 0,
             "size_bytes": 0,
-            "size_mb": 0.0
+            "size_mb": 0.0,
         }
 
         mock_llm.model_type = "gguf"
