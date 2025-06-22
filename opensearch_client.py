@@ -1,9 +1,13 @@
 import json
+import os
 import time
-from typing import List, Dict, Any, Optional
-from opensearchpy import OpenSearch, helpers
-import numpy as np
+from typing import Any, Dict, List, Optional
 
+import numpy as np
+from dotenv import load_dotenv
+from opensearchpy import OpenSearch, helpers
+
+load_dotenv('.env')
 
 class OpenSearchVectorStore:
     def __init__(self, 
@@ -188,8 +192,18 @@ class OpenSearchVectorStore:
 
 
 if __name__ == "__main__":
-    vector_store = OpenSearchVectorStore()
-    
+    opensearch_host = os.getenv("OPENSEARCH_HOST", "localhost")
+    opensearch_port = int(os.getenv("OPENSEARCH_PORT", "9200"))
+    opensearch_user = os.getenv("OPENSEARCH_USER", "admin")
+    opensearch_pass = os.getenv("OPENSEARCH_INITIAL_ADMIN_PASSWORD", "admin")
+
+    vector_store = OpenSearchVectorStore(
+        host=opensearch_host,
+        port=opensearch_port,
+        username=opensearch_user,
+        password=opensearch_pass
+    )
+
     test_documents = [
         {"content": "これは最初のテストドキュメントです。", "metadata": {"type": "test", "id": 1}},
         {"content": "二番目のドキュメントです。日本語のテストです。", "metadata": {"type": "test", "id": 2}},
