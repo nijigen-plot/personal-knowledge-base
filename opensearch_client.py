@@ -135,7 +135,7 @@ class OpenSearchVectorStore:
                 "knn": {
                     "embedding": {
                         "vector": query_embedding.tolist(),
-                        "k": k
+                        "k": k,
                     }
                 }
             },
@@ -182,7 +182,7 @@ class OpenSearchVectorStore:
             return {"error": f"インデックスが存在しません: {index_name}"}
 
         stats = self.client.indices.stats(index_name)
-        doc_count = stats["indices"][index_name]["total"]["docs"]["count"]
+        doc_count = stats["indices"][index_name]["total"]["indexing"]["index_total"]
         size_bytes = stats["indices"][index_name]["total"]["store"]["size_in_bytes"]
 
         return {
@@ -211,18 +211,36 @@ if __name__ == "__main__":
         {"content": "三番目のテストデータです。ベクトル検索の確認用です。", "metadata": {"type": "test", "id": 3}}
     ]
 
-    test_embeddings = np.random.random((3, 768)).astype(np.float32)
+    # 固定のベクトルを作成（テスト用）
+    test_vector = np.array([0.1] * 768, dtype=np.float32)
+    test_embeddings = np.array([test_vector, test_vector * 0.9, test_vector * 0.8])
 
     index_name = "test-knowledge-base"
 
     vector_store.create_index(index_name, 768, force_recreate=True)
+
+    # インデックスが完全に準備されるまで少し待つ
+    time.sleep(2)
+
     vector_store.add_documents(index_name, test_documents, test_embeddings)
+
+    # ドキュメントがインデックスされるまで待つ
+    time.sleep(3)
 
     stats = vector_store.get_index_stats(index_name)
     print(f"インデックス統計: {stats}")
 
-    query_embedding = np.random.random((1, 768)).astype(np.float32)
-    results = vector_store.search(index_name, query_embedding[0], k=2)
+    # 完全に同じベクトルで検索
+    print("\n=== 完全に同じベクトルで検索 ===")
+    results = vector_store.search(index_name, test_vector, k=3)
     print(f"検索結果: {len(results)}件")
-    for result in results:
-        print(f"  スコア: {result['score']:.4f}, 内容: {result['content'][:50]}...")
+    for i, result in enumerate(results):
+        print(f"  {i+1}. スコア: {result['score']:.6f}, 内容: {result['content'][:30]}...")
+
+    # 少し違うベクトルで検索
+    print("\n=== 少し違うベクトルで検索 ===")
+    similar_vector = test_vector * 1.1
+    results2 = vector_store.search(index_name, similar_vector, k=3)
+    print(f"検索結果: {len(results2)}件")
+    for i, result in enumerate(results2):
+        print(f"  {i+1}. スコア: {result['score']:.6f}, 内容: {result['content'][:30]}...")
