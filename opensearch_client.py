@@ -112,7 +112,7 @@ class OpenSearchVectorStore:
             self.client,
             actions,
             chunk_size=100,
-            timeout="60s"
+            timeout=60
         )
 
         end_time = time.perf_counter()
