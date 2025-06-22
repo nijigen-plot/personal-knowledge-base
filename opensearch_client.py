@@ -65,7 +65,7 @@ class OpenSearchVectorStore:
                         "method": {
                             "name": "hnsw",
                             "space_type": "cosinesimil",
-                            "engine": "nmslib",
+                            "engine": "faiss",
                             "parameters": {
                                 "ef_construction": 128,
                                 "m": 24
@@ -124,10 +124,10 @@ class OpenSearchVectorStore:
         return success_count, failed_items
 
     def search(self,
-               index_name: str,
-               query_embedding: np.ndarray,
-               k: int = 10,
-               filter_query: Optional[Dict] = None) -> List[Dict[str, Any]]:
+            index_name: str,
+            query_embedding: np.ndarray,
+            k: int = 10,
+            filter_query: Optional[Dict] = None) -> List[Dict[str, Any]]:
 
         search_body = {
             "size": k,
