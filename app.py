@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Literal, Optional
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from embedding_model import PlamoEmbedding
 from gemma3 import Gemma3Model
@@ -20,8 +20,23 @@ JST = timezone(timedelta(hours=9), name='JST')
 
 class DocumentRequest(BaseModel):
     content: str
-    timestamp: Optional[datetime] = datetime.now(JST)
+    timestamp: Optional[str] = None
     tag: Literal["lifestyle", "music", "technology"]
+
+    @field_validator('timestamp')
+    @classmethod
+    def validate_timestamp(cls, v):
+        if v is None:
+            # OpenSearchの期待するフォーマット: yyyy-MM-dd'T'HH:mm:ss.SSSSSS
+            return datetime.now(JST).strftime('%Y-%m-%dT%H:%M:%S.%f')
+
+        # OpenSearchのタイムスタンプフォーマットをバリデーション
+        try:
+            # yyyy-MM-dd'T'HH:mm:ss.SSSSSS の形式をチェック
+            datetime.strptime(v, '%Y-%m-%dT%H:%M:%S.%f')
+            return v
+        except ValueError:
+            raise ValueError('timestamp must be in OpenSearch format: "yyyy-MM-ddTHH:mm:ss.SSSSSS" (e.g., "2024-01-01T10:00:00.123456")')
 
 
 class SearchRequest(BaseModel):
@@ -134,7 +149,7 @@ async def add_document(request: DocumentRequest, content_type: str = Depends(req
         embedding = embedding_model.encode(request.content)
         document = {
             "tag": request.tag,
-            "timestamp": request.timestamp.isoformat(),
+            "timestamp": request.timestamp,
             "content": request.content
         }
 
