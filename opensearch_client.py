@@ -51,22 +51,22 @@ class OpenSearchVectorStore:
                 return
 
         index_mapping = {
-            "settings": {"index": {"knn": True, "knn.algo_param.ef_search": 100}},
+            "settings": {
+                "index.knn": True},
             "mappings": {
                 "properties": {
-                    "content": {"type": "text", "analyzer": "standard"},
-                    "embedding": {
+                    "content_vector": {
                         "type": "knn_vector",
                         "dimension": embedding_dimension,
                         "method": {
                             "name": "hnsw",
                             "space_type": "cosinesimil",
-                            "engine": "faiss",
-                            "parameters": {"ef_construction": 128, "m": 24},
-                        },
+                            "engine": "faiss"
+                        }
                     },
-                    "metadata": {"type": "object"},
-                    "timestamp": {"type": "date", "format": "epoch_millis"},
+                    "content": {"type": "text"},
+                    "tag": {"type": "keyword"},
+                    "timestamp": {"type": "date", "format": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"},
                 }
             },
         }
@@ -88,9 +88,9 @@ class OpenSearchVectorStore:
                 "_index": index_name,
                 "_source": {
                     "content": doc.get("content", ""),
-                    "embedding": embedding.tolist(),
-                    "metadata": doc.get("metadata", {}),
-                    "timestamp": int(time.time() * 1000),
+                    "content_vector": embedding.tolist(),
+                    "tag": doc.get("tag"),
+                    "timestamp": doc.get("timestamp")
                 },
             }
             actions.append(action)
@@ -114,25 +114,24 @@ class OpenSearchVectorStore:
         index_name: str,
         query_embedding: np.ndarray,
         k: int = 10,
-        filter_query: Optional[Dict] = None,
+        tag_filter: Optional[str] = None
     ) -> List[Dict[str, Any]]:
 
         search_body = {
             "size": k,
             "query": {
                 "knn": {
-                    "embedding": {
+                    "content_vector": {
                         "vector": query_embedding.tolist(),
                         "k": k,
                     }
                 }
-            },
-            "_source": {"excludes": ["embedding"]},
+            }
         }
 
-        if filter_query:
+        if tag_filter:
             search_body["query"] = {
-                "bool": {"must": [search_body["query"]], "filter": filter_query}
+                "bool": {"must": [search_body["query"]], "filter": {"term": {"tag": tag_filter}}}
             }
 
         start_time = time.perf_counter()
@@ -145,7 +144,7 @@ class OpenSearchVectorStore:
                 "id": hit["_id"],
                 "score": hit["_score"],
                 "content": hit["_source"]["content"],
-                "metadata": hit["_source"]["metadata"],
+                "tag": hit["_source"]["tag"],
                 "timestamp": hit["_source"]["timestamp"],
             }
             results.append(result)
@@ -191,15 +190,15 @@ if __name__ == "__main__":
     test_documents = [
         {
             "content": "これは最初のテストドキュメントです。",
-            "metadata": {"type": "test", "id": 1},
+            "tag": "lifestyle"
         },
         {
             "content": "二番目のドキュメントです。日本語のテストです。",
-            "metadata": {"type": "test", "id": 2},
+            "tag": "music"
         },
         {
             "content": "三番目のテストデータです。ベクトル検索の確認用です。",
-            "metadata": {"type": "test", "id": 3},
+            "tag": "technology"
         },
     ]
 
@@ -228,7 +227,7 @@ if __name__ == "__main__":
     print(f"検索結果: {len(results)}件")
     for i, result in enumerate(results):
         print(
-            f"  {i+1}. スコア: {result['score']:.6f}, 内容: {result['content'][:30]}..."
+            f"  {i+1}. スコア: {result['score']:.6f}, タグ: {result['tag']}, 内容: {result['content'][:30]}..."
         )
 
     # 少し違うベクトルで検索
@@ -238,5 +237,5 @@ if __name__ == "__main__":
     print(f"検索結果: {len(results2)}件")
     for i, result in enumerate(results2):
         print(
-            f"  {i+1}. スコア: {result['score']:.6f}, 内容: {result['content'][:30]}..."
+            f"  {i+1}. スコア: {result['score']:.6f}, タグ: {result['tag']}, 内容: {result['content'][:30]}..."
         )
