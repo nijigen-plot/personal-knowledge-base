@@ -328,4 +328,8 @@ async def conversation_with_rag(request: ConversationRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host=os.getenv("APP_HOST", "0.0.0.0"),
+        port=os.getenv("APP_PORT", 8050)
+        )
