@@ -2,7 +2,8 @@ import json
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Literal, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -14,25 +15,27 @@ from gemma3 import Gemma3Model
 from opensearch_client import OpenSearchVectorStore
 
 load_dotenv(".env")
+JST = timezone(timedelta(hours=9), name='JST')
 
 
 class DocumentRequest(BaseModel):
     content: str
-    metadata: Optional[Dict[str, Any]] = {}
+    timestamp: Optional[datetime] = datetime.now(JST)
+    tag: Literal["lifestyle", "music", "technology"]
 
 
 class SearchRequest(BaseModel):
     query: str
     k: Optional[int] = 10
-    filter_query: Optional[Dict] = None
+    tag_filter: Optional[Literal["lifestyle", "music", "technology"]] = None
 
 
 class SearchResult(BaseModel):
     id: str
     score: float
     content: str
-    metadata: Dict[str, Any]
-    timestamp: int
+    tag: Optional[Literal["lifestyle", "music", "technology"]]
+    timestamp: str
 
 
 class IndexStats(BaseModel):
@@ -121,9 +124,12 @@ async def add_document(request: DocumentRequest):
     try:
         start_time = time.perf_counter()
 
-        embedding = embedding_model.encode([request.content])
-
-        document = {"content": request.content, "metadata": request.metadata}
+        embedding = embedding_model.encode(request.content)
+        document = {
+            "tag": request.tag,
+            "timestamp": request.timestamp.isoformat(),
+            "content": request.content
+        }
 
         success_count, failed_items = vector_store.add_documents(
             INDEX_NAME, [document], embedding
@@ -155,7 +161,11 @@ async def add_documents_batch(requests: List[DocumentRequest]):
         embeddings = embedding_model.encode(contents)
 
         documents = [
-            {"content": req.content, "metadata": req.metadata} for req in requests
+            {
+                "tag": req.tag,
+                "timestamp": req.timestamp,
+                "content": req.content
+            } for req in requests
         ]
 
         success_count, failed_items = vector_store.add_documents(
@@ -186,7 +196,7 @@ async def search_documents(request: SearchRequest):
             INDEX_NAME,
             query_embedding[0],
             k=request.k,
-            filter_query=request.filter_query,
+            filter_query=request.tag_filter,
         )
 
         end_time = time.perf_counter()
@@ -196,7 +206,7 @@ async def search_documents(request: SearchRequest):
                 id=result["id"],
                 score=result["score"],
                 content=result["content"],
-                metadata=result["metadata"],
+                tag=result["tag"],
                 timestamp=result["timestamp"],
             )
             for result in results
@@ -304,7 +314,7 @@ async def conversation_with_rag(request: ConversationRequest):
                 id=result["id"],
                 score=result["score"],
                 content=result["content"],
-                metadata=result["metadata"],
+                tag=result["tag"],
                 timestamp=result["timestamp"],
             )
             for result in filtered_results

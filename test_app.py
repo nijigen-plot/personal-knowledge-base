@@ -31,8 +31,8 @@ def mock_vector_store():
             "id": "test_doc_1",
             "score": 0.9,
             "content": "これはテストドキュメントです",
-            "metadata": {"type": "test"},
-            "timestamp": 1640995200,
+            "tag": "music",
+            "timestamp": "2024-01-01T00:00:00.000000",
         }
     ]
     mock_store.get_index_stats.return_value = {
@@ -103,6 +103,10 @@ class TestSearchEndpoint:
     def test_search_success(self, client, mock_embedding_model, mock_vector_store):
         """正常な検索が動作することを確認"""
         response = client.post("/search", json={"query": "テスト", "k": 5})
+        
+        if response.status_code != 200:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
 
         assert response.status_code == 200
         data = response.json()
@@ -116,7 +120,7 @@ class TestSearchEndpoint:
         assert result["id"] == "test_doc_1"
         assert result["score"] == 0.9
         assert result["content"] == "これはテストドキュメントです"
-        assert result["metadata"]["type"] == "test"
+        assert result["tag"] == "music"
 
         # モックが正しく呼び出されたことを確認
         mock_embedding_model.encode.assert_called_once_with(["テスト"])
@@ -130,7 +134,7 @@ class TestSearchEndpoint:
             json={
                 "query": "テスト",
                 "k": 10,
-                "filter_query": {"metadata.type": "test"},
+                "tag_filter": "music"
             },
         )
 
@@ -140,7 +144,7 @@ class TestSearchEndpoint:
         # モックが正しいフィルタで呼び出されたことを確認
         mock_vector_store.search.assert_called_once()
         call_args = mock_vector_store.search.call_args
-        assert call_args[1]["filter_query"] == {"metadata.type": "test"}
+        assert call_args[1]["filter_query"] == "music"
 
     def test_search_missing_query(self, client):
         """クエリパラメータが不足している場合のエラー処理"""
@@ -165,7 +169,7 @@ class TestAddEndpoint:
         """正常なドキュメント追加が動作することを確認"""
         document_data = {
             "content": "新しいテストドキュメント",
-            "metadata": {"category": "test", "author": "pytest"},
+            "tag": "technology",
         }
 
         response = client.post("/documents", json=document_data)
@@ -180,20 +184,20 @@ class TestAddEndpoint:
 
         # モックが正しく呼び出されたことを確認
         mock_embedding_model.encode.assert_called_once_with(
-            ["新しいテストドキュメント"]
+            "新しいテストドキュメント"
         )
         mock_vector_store.add_documents.assert_called_once()
 
     def test_add_document_with_minimal_data(self, client):
         """最小限のデータでドキュメント追加"""
-        document_data = {"content": "最小限のドキュメント"}
+        document_data = {"content": "最小限のドキュメント", "tag": "lifestyle"}
 
         response = client.post("/documents", json=document_data)
         assert response.status_code == 200
 
     def test_add_document_missing_content(self, client):
         """コンテンツが不足している場合のエラー処理"""
-        document_data = {"metadata": {"test": "value"}}
+        document_data = {"tag": "music"}
 
         response = client.post("/documents", json=document_data)
         assert response.status_code == 422  # バリデーションエラー
@@ -203,7 +207,7 @@ class TestAddEndpoint:
         # 保存失敗をシミュレート
         mock_vector_store.add_documents.return_value = (0, ["failed_item"])
 
-        document_data = {"content": "失敗するドキュメント"}
+        document_data = {"content": "失敗するドキュメント", "tag": "music"}
 
         response = client.post("/documents", json=document_data)
         assert response.status_code == 500
@@ -253,7 +257,7 @@ class TestErrorHandling:
         """ドキュメント追加時のエンベディングエラー処理"""
         mock_embedding_model.encode.side_effect = Exception("エンベディングエラー")
 
-        document_data = {"content": "エラーテストドキュメント"}
+        document_data = {"content": "エラーテストドキュメント", "tag": "technology"}
         response = client.post("/documents", json=document_data)
 
         assert response.status_code == 500
@@ -276,6 +280,10 @@ class TestConversationEndpoint:
         }
 
         response = client.post("/conversation", json=conversation_data)
+        
+        if response.status_code != 200:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
 
         assert response.status_code == 200
         data = response.json()
@@ -318,8 +326,8 @@ class TestConversationEndpoint:
                 "id": "low_score_doc",
                 "score": 0.3,  # min_scoreより低い
                 "content": "関連性の低い文書",
-                "metadata": {},
-                "timestamp": 1640995200,
+                "tag": "low_score",
+                "timestamp": "2024-01-01T00:00:00.000000",
             }
         ]
 
@@ -342,6 +350,11 @@ class TestConversationEndpoint:
         conversation_data = {"question": "テスト質問"}
 
         response = client.post("/conversation", json=conversation_data)
+        
+        if response.status_code != 200:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
+            
         assert response.status_code == 200
 
     def test_conversation_missing_question(self, client):
