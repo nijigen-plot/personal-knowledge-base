@@ -251,7 +251,7 @@ async def reset_index():
         vector_store.delete_index(INDEX_NAME)
 
         embedding_dim = embedding_model.get_embedding_dimension()
-        vector_store.create_index(INDEX_NAME, embedding_dim)
+        vector_store.create_index(INDEX_NAME, embedding_dim, force_recreate=True)
 
         return {"message": "インデックスがリセットされました"}
 
