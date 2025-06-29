@@ -10,8 +10,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from embedding_model import PlamoEmbedding
-from opensearch_client import OpenSearchVectorStore
 from gemma3 import Gemma3Model
+from opensearch_client import OpenSearchVectorStore
 
 load_dotenv(".env")
 
@@ -331,5 +331,5 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host=os.getenv("APP_HOST", "0.0.0.0"),
-        port=os.getenv("APP_PORT", 8050)
+        port=int(os.getenv("APP_PORT", 8050))
         )
