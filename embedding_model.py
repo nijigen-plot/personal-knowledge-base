@@ -1,9 +1,14 @@
+import gc
+import os
 import time
 from typing import List, Union
 
 import numpy as np
 import torch
 from transformers import AutoModel, AutoTokenizer
+
+# メモリ解放を積極的に行う設定
+os.environ["MALLOC_TRIM_THRESHOLD_"] = "-1"
 
 
 class PlamoEmbedding:
@@ -48,6 +53,26 @@ class PlamoEmbedding:
 
     def get_embedding_dimension(self) -> int:
         return self.model.config.hidden_size
+
+    def clear_memory(self):
+        """メモリを明示的に解放"""
+        print("PlamoEmbeddingモデルのメモリを解放中...")
+
+        if hasattr(self, 'model') and self.model is not None:
+            del self.model
+        if hasattr(self, 'tokenizer') and self.tokenizer is not None:
+            del self.tokenizer
+
+        # Python ガベージコレクション
+        gc.collect()
+        print("PlamoEmbeddingモデルのメモリ解放完了")
+
+    def __del__(self):
+        """デストラクタでメモリ解放"""
+        try:
+            self.clear_memory()
+        except:
+            pass  # エラーが発生してもデストラクタでは例外を投げない
 
 
 if __name__ == "__main__":

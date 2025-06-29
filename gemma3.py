@@ -1,4 +1,5 @@
 import argparse
+import gc
 import logging
 import os
 import time
@@ -7,6 +8,9 @@ from typing import Any, Dict, List, Optional
 import torch
 from llama_cpp import Llama
 from transformers import pipeline
+
+# メモリ解放を積極的に行う設定
+os.environ["MALLOC_TRIM_THRESHOLD_"] = "-1"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -211,6 +215,24 @@ class Gemma3Model:
         if not silent:
             print(response_text)
         return response_text
+
+    def clear_memory(self):
+        """メモリを明示的に解放"""
+        print("Gemma3モデルのメモリを解放中...")
+
+        if hasattr(self, 'model') and self.model is not None:
+            del self.model
+
+        # Python ガベージコレクション
+        gc.collect()
+        print("Gemma3モデルのメモリ解放完了")
+
+    def __del__(self):
+        """デストラクタでメモリ解放"""
+        try:
+            self.clear_memory()
+        except:
+            pass  # エラーが発生してもデストラクタでは例外を投げない
 
 
 def main():
