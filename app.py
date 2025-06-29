@@ -6,9 +6,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from embedding_model import PlamoEmbedding
 from gemma3 import Gemma3Model
@@ -20,8 +20,23 @@ JST = timezone(timedelta(hours=9), name='JST')
 
 class DocumentRequest(BaseModel):
     content: str
-    timestamp: Optional[datetime] = datetime.now(JST)
+    timestamp: Optional[str] = None
     tag: Literal["lifestyle", "music", "technology"]
+
+    @field_validator('timestamp')
+    @classmethod
+    def validate_timestamp(cls, v):
+        if v is None:
+            # OpenSearchの期待するフォーマット: yyyy-MM-dd'T'HH:mm:ss.SSSSSS
+            return datetime.now(JST).strftime('%Y-%m-%dT%H:%M:%S.%f')
+
+        # OpenSearchのタイムスタンプフォーマットをバリデーション
+        try:
+            # yyyy-MM-dd'T'HH:mm:ss.SSSSSS の形式をチェック
+            datetime.strptime(v, '%Y-%m-%dT%H:%M:%S.%f')
+            return v
+        except ValueError:
+            raise ValueError('timestamp must be in OpenSearch format: "yyyy-MM-ddTHH:mm:ss.SSSSSS" (e.g., "2024-01-01T10:00:00.123456")')
 
 
 class SearchRequest(BaseModel):
@@ -118,16 +133,23 @@ app = FastAPI(
 async def root():
     return {"message": "ナレッジベースAPIへようこそ"}
 
+def require_json_content_type(content_type: str = Header(..., alias="content-type")):
+    if content_type.lower() != "application/json":
+        raise HTTPException(
+            status_code=400,
+            detail="Content-Type must be application/json"
+        )
+    return content_type
 
 @app.post("/documents")
-async def add_document(request: DocumentRequest):
+async def add_document(request: DocumentRequest, content_type: str = Depends(require_json_content_type)):
     try:
         start_time = time.perf_counter()
 
         embedding = embedding_model.encode(request.content)
         document = {
             "tag": request.tag,
-            "timestamp": request.timestamp.isoformat(),
+            "timestamp": request.timestamp,
             "content": request.content
         }
 
@@ -153,7 +175,7 @@ async def add_document(request: DocumentRequest):
 
 
 @app.post("/documents/batch")
-async def add_documents_batch(requests: List[DocumentRequest]):
+async def add_documents_batch(requests: List[DocumentRequest], content_type: str = Depends(require_json_content_type)):
     try:
         start_time = time.perf_counter()
 
@@ -186,7 +208,7 @@ async def add_documents_batch(requests: List[DocumentRequest]):
 
 
 @app.post("/search", response_model=List[SearchResult])
-async def search_documents(request: SearchRequest):
+async def search_documents(request: SearchRequest, content_type: str = Depends(require_json_content_type)):
     try:
         start_time = time.perf_counter()
 
@@ -244,7 +266,7 @@ async def reset_index():
         vector_store.delete_index(INDEX_NAME)
 
         embedding_dim = embedding_model.get_embedding_dimension()
-        vector_store.create_index(INDEX_NAME, embedding_dim)
+        vector_store.create_index(INDEX_NAME, embedding_dim, force_recreate=True)
 
         return {"message": "インデックスがリセットされました"}
 
@@ -255,7 +277,7 @@ async def reset_index():
 
 
 @app.post("/conversation", response_model=ConversationResponse)
-async def conversation_with_rag(request: ConversationRequest):
+async def conversation_with_rag(request: ConversationRequest, content_type: str = Depends(require_json_content_type)):
     """
     RAGを使用した会話: 質問→Embedding→OpenSearch検索→LLMが回答
     """

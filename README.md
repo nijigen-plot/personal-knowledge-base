@@ -20,8 +20,34 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 9. git embedding model repository `clone git@hf.co:pfnet/plamo-embedding-1b`
 10. run `docker compose up -d` (OpenSearch Server 専用のサーバーがあるのでそっちで立ち上げる)
 11. run `uv run pytest test_app.py` （単体テスト）
-12. run `uv run python app.py` (FastAPI立ち上げ)
+12. run `uv run uvicorn app:app --reload --port $APP_PORT` or `uv run python app.py`(FastAPI立ち上げ)
 
+## 過去データの挿入
+
+FastAPI経由でリクエストを送ってデータ挿入が可能
+
+接続確認
+```
+$ curl -i http://localhost:8050
+HTTP/1.1 200 OK
+date: Sun, 29 Jun 2025 14:05:07 GMT
+server: uvicorn
+content-length: 53
+content-type: application/json
+
+{"message":"ナレッジベースAPIへようこそ"}
+```
+
+データ挿入
+```
+url = f"http://localhost:8050/documents"
+response = requests.post(
+    url,
+    json=data,
+    headers={"Content-Type": "application/json"},
+    timeout=30
+)
+```
 ## 構成
 
 - OpenSearchは192.168.0.45でホスト（OpenSearch用サーバー）
