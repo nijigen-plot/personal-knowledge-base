@@ -110,7 +110,7 @@ class Gemma3Model:
             prompt: ユーザーからの質問
             use_history: 会話履歴を使用するか
             stream: ストリーミング出力するか
-            max_tokens: 最大トークン数
+            max_tokens: LLM回答の最大トークン数
             temperature: 生成の温度パラメータ
             knowledge_context: ナレッジベースからの追加情報
             silent: ログ出力を抑制するか（API用）
