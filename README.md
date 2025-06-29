@@ -28,6 +28,24 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 - FastAPIは192.168.0.46でホスト（LLM+Embedding用サーバー）
 - APIの公開は192.168.0.44がSSL証明書を持っている&プロキシサーバーを立てているのでリバースプロキシしてFastAPIにアクセスさせる
 
+# API
+
+## 入力構成
+
+- Timestamp (自動ではいる)
+    - Optionalにして過去文書を入れる時は明示できるようにする
+- タグ(話題が何に関連するものなのか。指定しない場合全て。)
+    - lifestyle, music, technology
+- 質問文(自由入力)
+
+# モデルのメモリ解放について
+
+https://github.com/mjun0812/hf-model-cleanup-experiment
+
+> export MALLOC_TRIM_THRESHOLD_=-1 + del model; gc.collect();で削除
+
+gemma3.py, embedding_model.pyに内容は記載
+
 # CPUメモ
 
 1. Raspberry Pi 5はBCM2712 SoCで、CPUはArm Cortex-A76 (https://eetimes.itmedia.co.jp/ee/articles/2309/28/news177.html)
