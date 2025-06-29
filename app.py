@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -118,9 +118,16 @@ app = FastAPI(
 async def root():
     return {"message": "ナレッジベースAPIへようこそ"}
 
+def require_json_content_type(content_type: str = Header(..., alias="content-type")):
+    if content_type.lower() != "application/json":
+        raise HTTPException(
+            status_code=400,
+            detail="Content-Type must be application/json"
+        )
+    return content_type
 
 @app.post("/documents")
-async def add_document(request: DocumentRequest):
+async def add_document(request: DocumentRequest, content_type: str = Depends(require_json_content_type)):
     try:
         start_time = time.perf_counter()
 
@@ -153,7 +160,7 @@ async def add_document(request: DocumentRequest):
 
 
 @app.post("/documents/batch")
-async def add_documents_batch(requests: List[DocumentRequest]):
+async def add_documents_batch(requests: List[DocumentRequest], content_type: str = Depends(require_json_content_type)):
     try:
         start_time = time.perf_counter()
 
@@ -186,7 +193,7 @@ async def add_documents_batch(requests: List[DocumentRequest]):
 
 
 @app.post("/search", response_model=List[SearchResult])
-async def search_documents(request: SearchRequest):
+async def search_documents(request: SearchRequest, content_type: str = Depends(require_json_content_type)):
     try:
         start_time = time.perf_counter()
 
@@ -255,7 +262,7 @@ async def reset_index():
 
 
 @app.post("/conversation", response_model=ConversationResponse)
-async def conversation_with_rag(request: ConversationRequest):
+async def conversation_with_rag(request: ConversationRequest, content_type: str = Depends(require_json_content_type)):
     """
     RAGを使用した会話: 質問→Embedding→OpenSearch検索→LLMが回答
     """
