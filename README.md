@@ -2,6 +2,13 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 
 # Setup
 
+## .env
+
+1. `cp .env.example .env`
+2. .envの各項目に値を記入
+
+## command flow
+
 1. install uv
 2. run `uv sync`
 3. get Hugging Face Write access token https://huggingface.co/docs/hub/security-tokens
@@ -9,8 +16,17 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 5. run `huggingface-cli login`
 6. paste Hugging Face access token
 7. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
-8. clone repository `git clone https://huggingface.co/google/gemma-3-4b-it` or `git clone git@hf.co:google/gemma-3-4b-it`(Need Write Permission Access Token)
+8. clone llm repository `git clone https://huggingface.co/google/gemma-3-4b-it` or `git clone git@hf.co:google/gemma-3-4b-it`(Need Write Permission Access Token)
+9. git embedding model repository `clone git@hf.co:pfnet/plamo-embedding-1b`
+10. run `docker compose up -d` (OpenSearch Server 専用のサーバーがあるのでそっちで立ち上げる)
+11. run `uv run pytest test_app.py` （単体テスト）
+12. run `uv run python app.py` (FastAPI立ち上げ)
 
+## 構成
+
+- OpenSearchは192.168.0.45でホスト（OpenSearch用サーバー）
+- FastAPIは192.168.0.46でホスト（LLM+Embedding用サーバー）
+- APIの公開は192.168.0.44がSSL証明書を持っている&プロキシサーバーを立てているのでリバースプロキシしてFastAPIにアクセスさせる
 
 # CPUメモ
 
