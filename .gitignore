@@ -20,3 +20,6 @@ gemma-3-1b-it-qat-q4_0-gguf/
 
 # Chat History file
 history.txt
+
+# Knowledge Base Local Contents
+old_docs/*
