@@ -1,13 +1,11 @@
-import json
 import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Literal, Optional
+from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, field_validator
 
 from embedding_model import PlamoEmbedding
@@ -15,7 +13,7 @@ from gemma3 import Gemma3Model
 from opensearch_client import OpenSearchVectorStore
 
 load_dotenv(".env")
-JST = timezone(timedelta(hours=9), name='JST')
+JST = timezone(timedelta(hours=9), name="JST")
 
 
 class DocumentRequest(BaseModel):
@@ -23,20 +21,22 @@ class DocumentRequest(BaseModel):
     timestamp: Optional[str] = None
     tag: Literal["lifestyle", "music", "technology"]
 
-    @field_validator('timestamp')
+    @field_validator("timestamp")
     @classmethod
     def validate_timestamp(cls, v):
         if v is None:
             # OpenSearchの期待するフォーマット: yyyy-MM-dd'T'HH:mm:ss.SSSSSS
-            return datetime.now(JST).strftime('%Y-%m-%dT%H:%M:%S.%f')
+            return datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
         # OpenSearchのタイムスタンプフォーマットをバリデーション
         try:
             # yyyy-MM-dd'T'HH:mm:ss.SSSSSS の形式をチェック
-            datetime.strptime(v, '%Y-%m-%dT%H:%M:%S.%f')
+            datetime.strptime(v, "%Y-%m-%dT%H:%M:%S.%f")
             return v
         except ValueError:
-            raise ValueError('timestamp must be in OpenSearch format: "yyyy-MM-ddTHH:mm:ss.SSSSSS" (e.g., "2024-01-01T10:00:00.123456")')
+            raise ValueError(
+                'timestamp must be in OpenSearch format: "yyyy-MM-ddTHH:mm:ss.SSSSSS" (e.g., "2024-01-01T10:00:00.123456")'
+            )
 
 
 class SearchRequest(BaseModel):
@@ -133,16 +133,19 @@ app = FastAPI(
 async def root():
     return {"message": "ナレッジベースAPIへようこそ"}
 
+
 def require_json_content_type(content_type: str = Header(..., alias="content-type")):
     if content_type.lower() != "application/json":
         raise HTTPException(
-            status_code=400,
-            detail="Content-Type must be application/json"
+            status_code=400, detail="Content-Type must be application/json"
         )
     return content_type
 
+
 @app.post("/documents")
-async def add_document(request: DocumentRequest, content_type: str = Depends(require_json_content_type)):
+async def add_document(
+    request: DocumentRequest, content_type: str = Depends(require_json_content_type)
+):
     try:
         start_time = time.perf_counter()
 
@@ -150,7 +153,7 @@ async def add_document(request: DocumentRequest, content_type: str = Depends(req
         document = {
             "tag": request.tag,
             "timestamp": request.timestamp,
-            "content": request.content
+            "content": request.content,
         }
 
         success_count, failed_items = vector_store.add_documents(
@@ -175,7 +178,10 @@ async def add_document(request: DocumentRequest, content_type: str = Depends(req
 
 
 @app.post("/documents/batch")
-async def add_documents_batch(requests: List[DocumentRequest], content_type: str = Depends(require_json_content_type)):
+async def add_documents_batch(
+    requests: List[DocumentRequest],
+    content_type: str = Depends(require_json_content_type),
+):
     try:
         start_time = time.perf_counter()
 
@@ -183,11 +189,8 @@ async def add_documents_batch(requests: List[DocumentRequest], content_type: str
         embeddings = embedding_model.encode(contents)
 
         documents = [
-            {
-                "tag": req.tag,
-                "timestamp": req.timestamp,
-                "content": req.content
-            } for req in requests
+            {"tag": req.tag, "timestamp": req.timestamp, "content": req.content}
+            for req in requests
         ]
 
         success_count, failed_items = vector_store.add_documents(
@@ -208,7 +211,9 @@ async def add_documents_batch(requests: List[DocumentRequest], content_type: str
 
 
 @app.post("/search", response_model=List[SearchResult])
-async def search_documents(request: SearchRequest, content_type: str = Depends(require_json_content_type)):
+async def search_documents(
+    request: SearchRequest, content_type: str = Depends(require_json_content_type)
+):
     try:
         start_time = time.perf_counter()
 
@@ -277,7 +282,9 @@ async def reset_index():
 
 
 @app.post("/conversation", response_model=ConversationResponse)
-async def conversation_with_rag(request: ConversationRequest, content_type: str = Depends(require_json_content_type)):
+async def conversation_with_rag(
+    request: ConversationRequest, content_type: str = Depends(require_json_content_type)
+):
     """
     RAGを使用した会話: 質問→Embedding→OpenSearch検索→LLMが回答
     """
@@ -363,5 +370,5 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host=os.getenv("APP_HOST", "0.0.0.0"),
-        port=int(os.getenv("APP_PORT", 8050))
-        )
+        port=int(os.getenv("APP_PORT", 8050)),
+    )

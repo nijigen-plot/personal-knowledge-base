@@ -58,9 +58,9 @@ class PlamoEmbedding:
         """メモリを明示的に解放"""
         print("PlamoEmbeddingモデルのメモリを解放中...")
 
-        if hasattr(self, 'model') and self.model is not None:
+        if hasattr(self, "model") and self.model is not None:
             del self.model
-        if hasattr(self, 'tokenizer') and self.tokenizer is not None:
+        if hasattr(self, "tokenizer") and self.tokenizer is not None:
             del self.tokenizer
 
         # Python ガベージコレクション
