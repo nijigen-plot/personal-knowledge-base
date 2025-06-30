@@ -11,6 +11,7 @@ wheels/
 
 # Credentials
 .env
+.envrc
 
 # Local Model
 gemma-3-4b-it/
