@@ -1,0 +1,69 @@
+repos:
+  # Python formatting with black
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        language_version: python3.11
+
+  # Import sorting with isort
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+
+  # Basic pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-ast           # Check Python AST
+      - id: check-builtin-literals
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+      - id: name-tests-test
+        args: ["--pytest-test-first"]
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+
+  # Security checks (disabled for now)
+  # - repo: https://github.com/PyCQA/bandit
+  #   rev: 1.8.0
+  #   hooks:
+  #     - id: bandit
+  #       args: ["-r", ".", "-f", "json", "-o", "bandit-report.json"]
+  #       exclude: ^(test_.*\.py|.*_test\.py)$
+
+  # Type checking with mypy (disabled for now)
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.13.0
+  #   hooks:
+  #     - id: mypy
+  #       additional_dependencies: [types-requests, types-PyYAML]
+  #       args: [--ignore-missing-imports, --no-strict-optional]
+  #       exclude: ^(test_.*\.py|.*_test\.py|script\.py|upload_.*\.py)$
+
+# Configuration
+default_stages: [pre-commit]
+fail_fast: false
+
+# CI configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false
