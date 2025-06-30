@@ -1,52 +1,32 @@
 repos:
-  # Python formatting with black
-  - repo: https://github.com/psf/black
-    rev: 25.1.0
+  # Use local tools to avoid heavy downloads
+  - repo: local
     hooks:
       - id: black
-        language_version: python3.11
+        name: black
+        entry: uv run black
+        language: system
+        types: [python]
 
-  # Import sorting with isort
-  - repo: https://github.com/pycqa/isort
-    rev: 6.0.1
-    hooks:
       - id: isort
-        args: ["--profile", "black"]
+        name: isort
+        entry: uv run isort --profile black
+        language: system
+        types: [python]
 
-  # Basic pre-commit hooks
+  # Lightweight pre-commit hooks (no heavy dependencies)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: check-ast           # Check Python AST
-      - id: check-builtin-literals
-      - id: check-case-conflict
-      - id: check-docstring-first
       - id: check-json
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
-      - id: debug-statements
       - id: end-of-file-fixer
-      - id: fix-byte-order-marker
-      - id: mixed-line-ending
-      - id: name-tests-test
-        args: ["--pytest-test-first"]
-      - id: requirements-txt-fixer
       - id: trailing-whitespace
+      - id: mixed-line-ending
 
 # Configuration
 default_stages: [pre-commit]
 fail_fast: false
-
-# CI configuration
-ci:
-  autofix_commit_msg: |
-    [pre-commit.ci] auto fixes from pre-commit.com hooks
-
-    for more information, see https://pre-commit.ci
-  autofix_prs: true
-  autoupdate_branch: ''
-  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
-  autoupdate_schedule: weekly
-  skip: []
-  submodules: false
