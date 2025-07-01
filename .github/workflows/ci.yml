@@ -27,4 +27,5 @@ jobs:
 
       - name: Run pre-commit
         run: |
-          uv run pre-commit run --all-files
+          FILES=$(git diff --name-only origin/master..origin/${GITHUB_HEAD_REF})
+          uv run pre-commit run --files $FILES

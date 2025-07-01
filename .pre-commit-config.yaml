@@ -1,32 +1,20 @@
 repos:
-  # Use local tools to avoid heavy downloads
-  - repo: local
-    hooks:
-      - id: black
-        name: black
-        entry: uv run black
-        language: system
-        types: [python]
-
-      - id: isort
-        name: isort
-        entry: uv run isort --profile black
-        language: system
-        types: [python]
-
-  # Lightweight pre-commit hooks (no heavy dependencies)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: check-ast           # Check Python AST
       - id: check-json
-      - id: check-merge-conflict
-      - id: check-toml
+      - id: detect-private-key
       - id: check-yaml
       - id: end-of-file-fixer
       - id: trailing-whitespace
-      - id: mixed-line-ending
-
-# Configuration
-default_stages: [pre-commit]
-fail_fast: false
+  - repo: https://github.com/pycqa/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        args: ["-sp", "pyproject.toml"]
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        args: ["--config", "pyproject.toml"]
