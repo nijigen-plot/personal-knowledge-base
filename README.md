@@ -10,7 +10,8 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 4. `cp .envrc.example .envrc`
 5. `sudo apt install nodejs npm`
 6. `sudo npm install -g dotenv-cli`
-7. `direnv allow`
+7. `source ~/.bashrc` (.bashrcに`eval "$(direnv hook bash)"`があること前提)
+8. `direnv allow`
 
 ## command flow
 
