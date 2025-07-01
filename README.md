@@ -6,6 +6,9 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 
 1. `cp .env.example .env`
 2. .envの各項目に値を記入
+3. `sudo apt-get install direnv`
+4. `cp .envrc.example .envrc`
+5. `direnv allow`
 
 ## command flow
 
