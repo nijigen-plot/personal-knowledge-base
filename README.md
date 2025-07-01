@@ -26,7 +26,7 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 9. git embedding model repository `git clone git@hf.co:pfnet/plamo-embedding-1b`
 10. run `docker compose up -d` (OpenSearch Server 専用のサーバーがあるのでそっちで立ち上げ済)
 11. run `uv run pytest test_app.py` （単体テスト）
-12. run `uv run uvicorn app:app --reload --port $APP_PORT` or `uv run python app.py`(FastAPI立ち上げ)
+12. run `uv run uvicorn app:app --reload --port $APP_PORT --host $APP_HOST` or `uv run python app.py`(FastAPI立ち上げ)
 
 ## 過去データの挿入
 
