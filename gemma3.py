@@ -220,7 +220,7 @@ class Gemma3Model:
         """メモリを明示的に解放"""
         print("Gemma3モデルのメモリを解放中...")
 
-        if hasattr(self, 'model') and self.model is not None:
+        if hasattr(self, "model") and self.model is not None:
             del self.model
 
         # Python ガベージコレクション

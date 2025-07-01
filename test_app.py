@@ -1,8 +1,7 @@
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
-import pytest_asyncio
 from fastapi.testclient import TestClient
 
 from app import app
@@ -79,7 +78,6 @@ def client(mock_embedding_model, mock_vector_store, mock_llm_model):
         patch("app.vector_store", mock_vector_store),
         patch("app.llm_model", mock_llm_model),
     ):
-
         # TestClientはresponseコードを自動で返す
         with TestClient(test_app) as test_client:
             # yieldにすることで、テスト後にAPIやDB接続を閉じることができる。今回はFastAPIのTestClientを使っているので、yieldでなくてもいい。
@@ -103,7 +101,7 @@ class TestSearchEndpoint:
     def test_search_success(self, client, mock_embedding_model, mock_vector_store):
         """正常な検索が動作することを確認"""
         response = client.post("/search", json={"query": "テスト", "k": 5})
-        
+
         if response.status_code != 200:
             print(f"Response status: {response.status_code}")
             print(f"Response body: {response.text}")
@@ -131,11 +129,7 @@ class TestSearchEndpoint:
         # フィルタ付きの検索リクエスト
         response = client.post(
             "/search",
-            json={
-                "query": "テスト",
-                "k": 10,
-                "tag_filter": "music"
-            },
+            json={"query": "テスト", "k": 10, "tag_filter": "music"},
         )
 
         assert response.status_code == 200
@@ -183,9 +177,7 @@ class TestAddEndpoint:
         assert data["embedding_dimension"] == 4
 
         # モックが正しく呼び出されたことを確認
-        mock_embedding_model.encode.assert_called_once_with(
-            "新しいテストドキュメント"
-        )
+        mock_embedding_model.encode.assert_called_once_with("新しいテストドキュメント")
         mock_vector_store.add_documents.assert_called_once()
 
     def test_add_document_with_minimal_data(self, client):
@@ -280,7 +272,7 @@ class TestConversationEndpoint:
         }
 
         response = client.post("/conversation", json=conversation_data)
-        
+
         if response.status_code != 200:
             print(f"Response status: {response.status_code}")
             print(f"Response body: {response.text}")
@@ -350,11 +342,11 @@ class TestConversationEndpoint:
         conversation_data = {"question": "テスト質問"}
 
         response = client.post("/conversation", json=conversation_data)
-        
+
         if response.status_code != 200:
             print(f"Response status: {response.status_code}")
             print(f"Response body: {response.text}")
-            
+
         assert response.status_code == 200
 
     def test_conversation_missing_question(self, client):
@@ -394,7 +386,6 @@ def mock_global_objects():
         patch("app.vector_store") as mock_vec,
         patch("app.llm_model") as mock_llm,
     ):
-
         # デフォルトの動作を設定
         mock_emb.encode.return_value = np.array([[0.1, 0.2, 0.3, 0.4]])
         mock_emb.get_embedding_dimension.return_value = 4

@@ -51,8 +51,7 @@ class OpenSearchVectorStore:
                 return
 
         index_mapping = {
-            "settings": {
-                "index.knn": True},
+            "settings": {"index.knn": True},
             "mappings": {
                 "properties": {
                     "content_vector": {
@@ -61,12 +60,15 @@ class OpenSearchVectorStore:
                         "method": {
                             "name": "hnsw",
                             "space_type": "cosinesimil",
-                            "engine": "faiss"
-                        }
+                            "engine": "faiss",
+                        },
                     },
                     "content": {"type": "text"},
                     "tag": {"type": "keyword"},
-                    "timestamp": {"type": "date", "format": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"},
+                    "timestamp": {
+                        "type": "date",
+                        "format": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+                    },
                 }
             },
         }
@@ -90,7 +92,7 @@ class OpenSearchVectorStore:
                     "content": doc.get("content", ""),
                     "content_vector": embedding.tolist(),
                     "tag": doc.get("tag"),
-                    "timestamp": doc.get("timestamp")
+                    "timestamp": doc.get("timestamp"),
                 },
             }
             actions.append(action)
@@ -114,7 +116,7 @@ class OpenSearchVectorStore:
         index_name: str,
         query_embedding: np.ndarray,
         k: int = 10,
-        tag_filter: Optional[str] = None
+        tag_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
 
         search_body = {
@@ -126,12 +128,15 @@ class OpenSearchVectorStore:
                         "k": k,
                     }
                 }
-            }
+            },
         }
 
         if tag_filter:
             search_body["query"] = {
-                "bool": {"must": [search_body["query"]], "filter": {"term": {"tag": tag_filter}}}
+                "bool": {
+                    "must": [search_body["query"]],
+                    "filter": {"term": {"tag": tag_filter}},
+                }
             }
 
         start_time = time.perf_counter()
@@ -188,17 +193,11 @@ if __name__ == "__main__":
     )
 
     test_documents = [
-        {
-            "content": "これは最初のテストドキュメントです。",
-            "tag": "lifestyle"
-        },
-        {
-            "content": "二番目のドキュメントです。日本語のテストです。",
-            "tag": "music"
-        },
+        {"content": "これは最初のテストドキュメントです。", "tag": "lifestyle"},
+        {"content": "二番目のドキュメントです。日本語のテストです。", "tag": "music"},
         {
             "content": "三番目のテストデータです。ベクトル検索の確認用です。",
-            "tag": "technology"
+            "tag": "technology",
         },
     ]
 
