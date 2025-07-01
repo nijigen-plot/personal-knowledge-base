@@ -8,7 +8,9 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 2. .envの各項目に値を記入
 3. `sudo apt-get install direnv`
 4. `cp .envrc.example .envrc`
-5. `direnv allow`
+5. `sudo apt install nodejs npm`
+6. `sudo npm install -g dotenv-cli`
+7. `direnv allow`
 
 ## command flow
 
