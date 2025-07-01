@@ -16,15 +16,15 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 ## command flow
 
 1. install uv
-2. run `uv sync`
+2. run `uv sync --all-groups`
 3. get Hugging Face Write access token https://huggingface.co/docs/hub/security-tokens
 4. install [huggingface-cli](https://huggingface.co/docs/huggingface_hub/main/guides/cli)
 5. run `huggingface-cli login`
 6. paste Hugging Face access token
 7. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
-8. clone llm repository `git clone https://huggingface.co/google/gemma-3-4b-it` or `git clone git@hf.co:google/gemma-3-4b-it`(Need Write Permission Access Token)
-9. git embedding model repository `clone git@hf.co:pfnet/plamo-embedding-1b`
-10. run `docker compose up -d` (OpenSearch Server 専用のサーバーがあるのでそっちで立ち上げる)
+8. clone llm repository `git clone git@hf.co:google/gemma-3-1b-it-qat-q4_0-gguf`(Need Write Permission Access Token)
+9. git embedding model repository `git clone git@hf.co:pfnet/plamo-embedding-1b`
+10. run `docker compose up -d` (OpenSearch Server 専用のサーバーがあるのでそっちで立ち上げ済)
 11. run `uv run pytest test_app.py` （単体テスト）
 12. run `uv run uvicorn app:app --reload --port $APP_PORT` or `uv run python app.py`(FastAPI立ち上げ)
 
