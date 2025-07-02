@@ -185,24 +185,36 @@ async def add_documents_batch(
     try:
         start_time = time.perf_counter()
 
-        contents = [req.content for req in requests]
-        embeddings = embedding_model.encode(contents)
+        total_success_count = 0
+        total_failed_items = []
 
-        documents = [
-            {"tag": req.tag, "timestamp": req.timestamp, "content": req.content}
-            for req in requests
-        ]
+        # 50個ずつに分割して処理
+        batch_size = 50
+        for i in range(0, len(requests), batch_size):
+            batch_requests = requests[i : i + batch_size]
 
-        success_count, failed_items = vector_store.add_documents(
-            INDEX_NAME, documents, embeddings
-        )
+            contents = [req.content for req in batch_requests]
+            embeddings = embedding_model.encode(contents)
+
+            documents = [
+                {"tag": req.tag, "timestamp": req.timestamp, "content": req.content}
+                for req in batch_requests
+            ]
+
+            success_count, failed_items = vector_store.add_documents(
+                INDEX_NAME, documents, embeddings
+            )
+
+            total_success_count += success_count
+            if failed_items:
+                total_failed_items.extend(failed_items)
 
         end_time = time.perf_counter()
 
         return {
-            "message": f"{success_count}件のドキュメントが追加されました",
-            "success_count": success_count,
-            "failed_count": len(failed_items) if failed_items else 0,
+            "message": f"{total_success_count}件のドキュメントが追加されました",
+            "success_count": total_success_count,
+            "failed_count": len(total_failed_items),
             "processing_time": round(end_time - start_time, 2),
         }
 
