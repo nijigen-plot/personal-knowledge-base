@@ -6,6 +6,7 @@ from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, field_validator
 
 from embedding_model import PlamoEmbedding
@@ -173,10 +174,12 @@ curl -X POST "https://home.quark-hardcore/personal-knowledge-base/conversation" 
     ],
 )
 
-
-@app.get("/")
-async def root():
-    return {"message": "ナレッジベースAPIへようこそ"}
+header_scheme = APIKeyHeader(
+    name="admin-api-key",
+    scheme_name="Admin API Key",
+    description="一部アクセスを制限するためのAPIキー",
+    auto_error=True,
+)
 
 
 def require_json_content_type(content_type: str = Header(..., alias="content-type")):
@@ -187,9 +190,33 @@ def require_json_content_type(content_type: str = Header(..., alias="content-typ
     return content_type
 
 
+@staticmethod
+def check_api_key(api_key: Optional[str]) -> Optional[str]:
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    expected_api_key = os.getenv("ADMIN_API_KEY")
+    if not expected_api_key:
+        raise HTTPException(status_code=500, detail="API key is not configured")
+    if api_key != expected_api_key:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+    return api_key
+
+
+def verify_api_key(api_key: str = Depends(header_scheme)):
+    return check_api_key(api_key)
+
+
+@app.get("/")
+async def root():
+    return {"message": "ナレッジベースAPIへようこそ"}
+
+
 @app.post("/documents")
 async def add_document(
-    request: DocumentRequest, content_type: str = Depends(require_json_content_type)
+    request: DocumentRequest,
+    content_type: str = Depends(require_json_content_type),
+    key: str = Depends(verify_api_key),
 ):
     try:
         start_time = time.perf_counter()
@@ -226,6 +253,7 @@ async def add_document(
 async def add_documents_batch(
     requests: List[DocumentRequest],
     content_type: str = Depends(require_json_content_type),
+    key: str = Depends(verify_api_key),
 ):
     try:
         start_time = time.perf_counter()
@@ -269,7 +297,9 @@ async def add_documents_batch(
 
 @app.post("/search", response_model=List[SearchResult])
 async def search_documents(
-    request: SearchRequest, content_type: str = Depends(require_json_content_type)
+    request: SearchRequest,
+    content_type: str = Depends(require_json_content_type),
+    key: str = Depends(verify_api_key),
 ):
     try:
         start_time = time.perf_counter()
@@ -303,7 +333,7 @@ async def search_documents(
 
 
 @app.get("/stats", response_model=IndexStats)
-async def get_index_stats():
+async def get_index_stats(key: str = Depends(verify_api_key)):
     try:
         stats = vector_store.get_index_stats(INDEX_NAME)
 
@@ -323,7 +353,7 @@ async def get_index_stats():
 
 
 @app.delete("/index")
-async def reset_index():
+async def reset_index(key: str = Depends(verify_api_key)):
     try:
         vector_store.delete_index(INDEX_NAME)
 
