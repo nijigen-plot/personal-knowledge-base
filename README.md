@@ -75,6 +75,12 @@ response = requests.post(
     - lifestyle, music, technology
 - 質問文(自由入力)
 
+# 開発
+
+## Formatter/CI
+
+`uv run pre-commit run --all-files`でコミット前にフォーマットチェック
+
 # モデルのメモリ解放について
 
 https://github.com/mjun0812/hf-model-cleanup-experiment
