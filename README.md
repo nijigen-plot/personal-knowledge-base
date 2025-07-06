@@ -28,6 +28,10 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 11. run `uv run pytest test_app.py` （単体テスト）
 12. run `uv run uvicorn app:app --reload --port $APP_PORT --host $APP_HOST` or `uv run python app.py`(FastAPI立ち上げ)
 
+
+### daemon
+`/etc/systemd/system/personal-knowledge-base-fastapi.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
+
 ## 過去データの挿入
 
 FastAPI経由でリクエストを送ってデータ挿入が可能
@@ -58,7 +62,8 @@ response = requests.post(
 
 - OpenSearchは192.168.0.45でホスト（OpenSearch用サーバー）
 - FastAPIは192.168.0.46でホスト（LLM+Embedding用サーバー）
-- APIの公開は192.168.0.44がSSL証明書を持っている&プロキシサーバーを立てているのでリバースプロキシしてFastAPIにアクセスさせる
+- APIの公開は192.168.0.44がSSL証明書を持っている&プロキシサーバーを立てているのでリバースプロキシしてFastAPIにアクセスさせてます
+    - 設定内容は192.168.0.44の`/etc/apache2/sites-enabled/`を参照
 
 # API
 
