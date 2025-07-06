@@ -62,7 +62,8 @@ response = requests.post(
 
 - OpenSearchは192.168.0.45でホスト（OpenSearch用サーバー）
 - FastAPIは192.168.0.46でホスト（LLM+Embedding用サーバー）
-- APIの公開は192.168.0.44がSSL証明書を持っている&プロキシサーバーを立てているのでリバースプロキシしてFastAPIにアクセスさせる
+- APIの公開は192.168.0.44がSSL証明書を持っている&プロキシサーバーを立てているのでリバースプロキシしてFastAPIにアクセスさせてます
+    - 設定内容は192.168.0.44の`/etc/apache2/sites-enabled/`を参照
 
 # API
 
