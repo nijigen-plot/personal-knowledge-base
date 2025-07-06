@@ -122,10 +122,55 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="ナレッジベースAPI",
-    description="PlamoEmbeddingとOpenSearchを使用したドキュメント保存・検索API",
+    title="ナレッジベース API",
+    description="""# ナレッジベース API
+
+このAPIは[@Quarkgabber](https://quark-hardcore.com/)の日常が分かるナレッジベースです。
+
+
+## 使用例
+
+### RAG会話
+```bash
+curl -X POST "https://home.quark-hardcore/personal-knowledge-base/conversation" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "最近あった出来事は？"}'
+```
+
+## 機能詳細
+- **PlamoEmbedding** (pfnet/plamo-embedding-1b) を使用したドキュメントベクトル化
+- **OpenSearch** を使用した高速ベクトル検索(RAG)
+- **Gemma 3** モデルを使用した対話
+
+    """,
     version="1.0.0",
     lifespan=lifespan,
+    openapi_tags=[
+        {
+            "name": "documents",
+            "description": "ドキュメントの追加",
+        },
+        {
+            "name": "documents/batch",
+            "description": "ドキュメントの一括追加",
+        },
+        {
+            "name": "search",
+            "description": "OpenSearchへの検索リクエスト",
+        },
+        {
+            "name": "conversation",
+            "description": "LLM+RAGによる私との会話",
+        },
+        {
+            "name": "index",
+            "description": "indexの削除",
+        },
+        {
+            "name": "stats",
+            "description": "インデックスの文書量等統計情報",
+        },
+    ],
 )
 
 
