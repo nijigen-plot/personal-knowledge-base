@@ -1,3 +1,4 @@
+import os
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -80,6 +81,7 @@ def client(mock_embedding_model, mock_vector_store, mock_llm_model):
     ):
         # TestClientはresponseコードを自動で返す
         with TestClient(test_app) as test_client:
+            test_client.headers.update({"admin-api-key": os.getenv("ADMIN_API_KEY")})
             # yieldにすることで、テスト後にAPIやDB接続を閉じることができる。今回はFastAPIのTestClientを使っているので、yieldでなくてもいい。
             yield test_client
 
