@@ -136,7 +136,6 @@ class Gemma3Model:
                 また、あなたはRAG（Retrieval-Augmented Generation）と繋がっています。
                 ユーザーがRAGコンテキスト機能を利用した場合は、この後に続いてRAGコンテキストが提供されるので、
                 それを活用して回答を生成してください。
-                時間を提供します。今の時間は{datetime.now(timezone(timedelta(hours=9)))}です。
             """,
             }
         ]
@@ -239,7 +238,58 @@ class Gemma3Model:
         gc.collect()
         print("Gemma3モデルのメモリ解放完了")
 
-    def extract_filters(self, text: str, max_retries: int = 3) -> Dict[str, Any]:
+    def _extract_timestamp_with_regex(self, text: str) -> Optional[Dict[str, str]]:
+        """正規表現を使用してタイムスタンプを抽出"""
+        now = datetime.now(timezone(timedelta(hours=9)))
+
+        # 相対的な時間表現のマッピング
+        time_patterns = {
+            r"今日|きょう": (0, "days"),
+            r"昨日|きのう": (1, "days"),
+            r"一昨日|おととい": (2, "days"),
+            r"最近|近頃": (7, "days"),
+            r"先週|前週": (7, "days"),
+            r"今週|こんしゅう": (0, "days"),
+            r"先月|前月": (30, "days"),
+            r"今月|こんげつ": (0, "days"),
+            r"去年|昨年": (365, "days"),
+            r"今年|こんねん": (0, "days"),
+            r"(\d+)日前": (None, "days"),
+            r"(\d+)週間前": (None, "weeks"),
+            r"(\d+)ヶ月前|(\d+)か月前": (None, "months"),
+            r"(\d+)年前": (None, "years"),
+        }
+
+        for pattern, (days_offset, unit) in time_patterns.items():
+            match = re.search(pattern, text)
+            if match:
+                if days_offset is None:
+                    # 数字を抽出
+                    number = int(match.group(1))
+                    if unit == "days":
+                        start_date = now - timedelta(days=number)
+                    elif unit == "weeks":
+                        start_date = now - timedelta(weeks=number)
+                    elif unit == "months":
+                        start_date = now - timedelta(days=number * 30)
+                    elif unit == "years":
+                        start_date = now - timedelta(days=number * 365)
+                else:
+                    start_date = now - timedelta(days=days_offset)
+
+                # 期間の終了時刻を設定
+                if "今日" in pattern or "きょう" in pattern:
+                    end_date = now
+                elif days_offset == 0:  # 今週、今月、今年
+                    end_date = now
+                else:
+                    end_date = now
+
+                return {"gte": start_date.isoformat(), "lte": end_date.isoformat()}
+
+        return None
+
+    def extract_tag(self, text: str, max_retries: int = 3) -> Dict[str, Any]:
         """
         文章からタグとタイムスタンプ期間を抽出
 
@@ -249,32 +299,32 @@ class Gemma3Model:
 
         Returns:
             {
-                "tag": ["lifestyle", "music", "technology"] のいずれか0個以上,
+                "tag": ["lifestyle", "music", "technology"] のいずれか1個か無し。
                 "timestamp": {
-                    "gte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS" or null,
-                    "lte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS" or null,
+                    "gte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+                    "lte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
                 },
-                "content": "元ををのをここにそのまま入れてください"
+                "content": "元の文章がここにはいる"
             }
         """
-        prompt = f"""以下の文章を分析して、該当するタグとタイムスタンプ期間を抽出してください。
+        # まず正規表現でタイムスタンプを抽出
+        timestamp_result = self._extract_timestamp_with_regex(text)
+
+        prompt = f"""以下の文章を分析して、該当するタグを抽出してください。
 
 文章: {text}
 
 抽出ルール:
 1. タグは lifestyle, music, technology のいずれか１つで、何にも該当しない場合はtagのkey valueを含めないでください。
-2. 暗黙的に時間的な表現(最近、2年前、先月等）があればOpenSearchのフィルターように時間を抽出します。何にも該当しない場合は timestamp のkey valueを含めないでください。
-3. 元の文章は content フィールドにそのまま入れてください
-4. 必ず以下のJSON形式で回答してください：
+2. 必ず以下のJSON形式で回答してください：
 
 {{
-  "tag": ["lifestyle"],
-  "timestamp": {{
-    "gte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
-    "lte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-  }},
-  "content": "元の文章をここにそのまま入れてください"
+  "tag": ["lifestyle"]
 }}
+
+または、該当するタグがない場合：
+
+{{}}
 
 他の形式での回答は禁止されています。JSONのみ出力してください。"""
 
@@ -295,9 +345,20 @@ class Gemma3Model:
                 if json_str:
                     result = json.loads(json_str)
 
+                    # 結果を組み立て
+                    final_result = {"content": text}
+
+                    # タグが含まれていれば追加
+                    if "tag" in result:
+                        final_result["tag"] = result["tag"]
+
+                    # 正規表現で抽出したタイムスタンプを追加
+                    if timestamp_result:
+                        final_result["timestamp"] = timestamp_result
+
                     # バリデーション
-                    if self._validate_extraction_result(result):
-                        return result
+                    if self._validate_extraction_result(final_result):
+                        return final_result
 
             except (json.JSONDecodeError, KeyError, TypeError) as e:
                 logger.warning(
@@ -305,8 +366,11 @@ class Gemma3Model:
                 )
                 continue
 
-        # 3回リトライした場合はcontentのみを返す
-        return {"content": text}
+        # 3回リトライした場合はcontentと正規表現抽出結果を返す
+        final_result = {"content": text}
+        if timestamp_result:
+            final_result["timestamp"] = timestamp_result
+        return final_result
 
     def _extract_json_from_response(self, response: str) -> Optional[str]:
         """レスポンスからJSONを抽出"""
@@ -317,7 +381,7 @@ class Gemma3Model:
             return match.group(1)
 
         # 直接JSONを探す
-        json_pattern = r"\{.*?\}"
+        json_pattern = r"(\{.*?\})"
         match = re.search(json_pattern, response, re.DOTALL)
         if match:
             return match.group(1)
@@ -396,7 +460,7 @@ def main():
         "--temperature", type=float, default=0.3, help="生成の温度パラメータ"
     )
     parser.add_argument(
-        "--extract-filters",
+        "--extract-tag",
         action="store_true",
         help="文章からOpenSearch Filter用のタグとタイムスタンプを抽出",
     )
@@ -409,8 +473,8 @@ def main():
     # モデル初期化
     model = Gemma3Model(model_type=args.model_type, model_size=args.model_size)
 
-    if args.extract_filters:
-        model.extract_filters(
+    if args.extract_tag:
+        model.extract_tag(
             text=args.prompt,
         )
     else:
