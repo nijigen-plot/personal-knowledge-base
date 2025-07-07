@@ -1,9 +1,12 @@
 import argparse
 import gc
+import json
 import logging
 import os
+import re
 import time
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from llama_cpp import Llama
@@ -100,11 +103,11 @@ class Gemma3Model:
     def generate(
         self,
         prompt: str,
+        rag_context: Optional[str] = None,
         use_history: bool = True,
         stream: bool = True,
         max_tokens: int = 512,
         temperature: float = 0.3,
-        knowledge_context: Optional[str] = None,
         silent: bool = False,
     ) -> str:
         """
@@ -116,7 +119,6 @@ class Gemma3Model:
             stream: ストリーミング出力するか
             max_tokens: LLM回答の最大トークン数
             temperature: 生成の温度パラメータ
-            knowledge_context: ナレッジベースからの追加情報
             silent: ログ出力を抑制するか（API用）
 
         Returns:
@@ -126,15 +128,25 @@ class Gemma3Model:
 
         # システムプロンプトの構築
         system_content = [
-            {"type": "text", "text": "あなたは日本語を話すAIアシスタントです。"}
+            {
+                "type": "text",
+                "text": f"""
+                あなたは会話アシスタントです。
+                ユーザーの質問に対して、適切な回答を生成してください。
+                また、あなたはRAG（Retrieval-Augmented Generation）と繋がっています。
+                ユーザーがRAGコンテキスト機能を利用した場合は、この後に続いてRAGコンテキストが提供されるので、
+                それを活用して回答を生成してください。
+                時間を提供します。今の時間は{datetime.now(timezone(timedelta(hours=9)))}です。
+            """,
+            }
         ]
 
-        # ナレッジベースからの情報を追加
-        if knowledge_context:
+        # RAGコンテキストが提供されている場合は追加
+        if rag_context:
             system_content.append(
                 {
                     "type": "text",
-                    "text": f"以下の情報を参考にして回答してください：\n{knowledge_context}",
+                    "text": f"RAGコンテキストが提供されました:\n{rag_context}",
                 }
             )
 
@@ -227,6 +239,129 @@ class Gemma3Model:
         gc.collect()
         print("Gemma3モデルのメモリ解放完了")
 
+    def extract_filters(self, text: str, max_retries: int = 3) -> Dict[str, Any]:
+        """
+        文章からタグとタイムスタンプ期間を抽出
+
+        Args:
+            text: 解析対象の文章
+            max_retries: JSON解析失敗時のリトライ回数
+
+        Returns:
+            {
+                "tag": ["lifestyle", "music", "technology"] のいずれか0個以上,
+                "timestamp": {
+                    "gte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS" or null,
+                    "lte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS" or null,
+                },
+                "content": "元ををのをここにそのまま入れてください"
+            }
+        """
+        prompt = f"""以下の文章を分析して、該当するタグとタイムスタンプ期間を抽出してください。
+
+文章: {text}
+
+抽出ルール:
+1. タグは lifestyle, music, technology のいずれか１つで、何にも該当しない場合はtagのkey valueを含めないでください。
+2. 暗黙的に時間的な表現(最近、2年前、先月等）があればOpenSearchのフィルターように時間を抽出します。何にも該当しない場合は timestamp のkey valueを含めないでください。
+3. 元の文章は content フィールドにそのまま入れてください
+4. 必ず以下のJSON形式で回答してください：
+
+{{
+  "tag": ["lifestyle"],
+  "timestamp": {{
+    "gte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+    "lte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+  }},
+  "content": "元の文章をここにそのまま入れてください"
+}}
+
+他の形式での回答は禁止されています。JSONのみ出力してください。"""
+
+        for attempt in range(max_retries):
+            try:
+                response = self.generate(
+                    prompt=prompt,
+                    use_history=False,
+                    stream=False,
+                    max_tokens=512,
+                    temperature=0.3,
+                    silent=False,
+                )
+                print(f"抽出結果 (試行 {attempt + 1}/{max_retries}): {response}")
+
+                # JSONブロックを抽出
+                json_str = self._extract_json_from_response(response)
+                if json_str:
+                    result = json.loads(json_str)
+
+                    # バリデーション
+                    if self._validate_extraction_result(result):
+                        return result
+
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.warning(
+                    f"JSON解析エラー (試行 {attempt + 1}/{max_retries}): {e}"
+                )
+                continue
+
+        # 3回リトライした場合はcontentのみを返す
+        return {"content": text}
+
+    def _extract_json_from_response(self, response: str) -> Optional[str]:
+        """レスポンスからJSONを抽出"""
+        # JSONブロックを抽出
+        json_pattern = r"```json\s*(\{.*?\})\s*```"
+        match = re.search(json_pattern, response, re.DOTALL)
+        if match:
+            return match.group(1)
+
+        # 直接JSONを探す
+        json_pattern = r"\{.*?\}"
+        match = re.search(json_pattern, response, re.DOTALL)
+        if match:
+            return match.group(1)
+
+        return None
+
+    def _validate_extraction_result(self, result: Dict[str, Any]) -> bool:
+        """抽出結果のバリデーション"""
+        if not isinstance(result, dict):
+            return False
+
+        # contentの検証（必須）
+        if "content" not in result or not isinstance(result["content"], str):
+            return False
+
+        # tagの検証（オプション）
+        if "tag" in result:
+            if not isinstance(result["tag"], list):
+                return False
+            # 1つのタグのみ許容
+            if len(result["tag"]) != 1:
+                return False
+            valid_tags = {"lifestyle", "music", "technology"}
+            if result["tag"][0] not in valid_tags:
+                return False
+
+        # timestampの検証（オプション）
+        if "timestamp" in result:
+            timestamp = result["timestamp"]
+            if timestamp is not None:
+                if not isinstance(timestamp, dict):
+                    return False
+
+                # gteとlteが存在する場合は文字列または null であることを確認
+                if "gte" in timestamp and timestamp["gte"] is not None:
+                    if not isinstance(timestamp["gte"], str):
+                        return False
+
+                if "lte" in timestamp and timestamp["lte"] is not None:
+                    if not isinstance(timestamp["lte"], str):
+                        return False
+
+        return True
+
     def __del__(self):
         """デストラクタでメモリ解放"""
         try:
@@ -260,6 +395,11 @@ def main():
     parser.add_argument(
         "--temperature", type=float, default=0.3, help="生成の温度パラメータ"
     )
+    parser.add_argument(
+        "--extract-filters",
+        action="store_true",
+        help="文章からOpenSearch Filter用のタグとタイムスタンプを抽出",
+    )
 
     args = parser.parse_args()
 
@@ -269,14 +409,19 @@ def main():
     # モデル初期化
     model = Gemma3Model(model_type=args.model_type, model_size=args.model_size)
 
-    # テキスト生成
-    response = model.generate(
-        prompt=args.prompt,
-        use_history=not args.no_history,
-        stream=not args.no_stream,
-        max_tokens=args.max_tokens,
-        temperature=args.temperature,
-    )
+    if args.extract_filters:
+        model.extract_filters(
+            text=args.prompt,
+        )
+    else:
+        # テキスト生成
+        model.generate(
+            prompt=args.prompt,
+            use_history=not args.no_history,
+            stream=not args.no_stream,
+            max_tokens=args.max_tokens,
+            temperature=args.temperature,
+        )
 
 
 if __name__ == "__main__":
