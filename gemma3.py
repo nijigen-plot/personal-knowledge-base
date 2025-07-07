@@ -319,7 +319,7 @@ class Gemma3Model:
 2. 必ず以下のJSON形式で回答してください：
 
 {{
-  "tag": ["lifestyle"]
+  "tag": ["ここに該当するタグを1つだけ入れてください"],
 }}
 
 または、該当するタグがない場合：
@@ -335,7 +335,7 @@ class Gemma3Model:
                     use_history=False,
                     stream=False,
                     max_tokens=512,
-                    temperature=0.3,
+                    temperature=0.1,
                     silent=False,
                 )
                 print(f"抽出結果 (試行 {attempt + 1}/{max_retries}): {response}")
@@ -358,6 +358,7 @@ class Gemma3Model:
 
                     # バリデーション
                     if self._validate_extraction_result(final_result):
+                        print(final_result)
                         return final_result
 
             except (json.JSONDecodeError, KeyError, TypeError) as e:
