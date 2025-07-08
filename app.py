@@ -44,6 +44,7 @@ class SearchRequest(BaseModel):
     query: str
     k: Optional[int] = 10
     tag_filter: Optional[Literal["lifestyle", "music", "technology"]] = None
+    timestamp_filter: Optional[dict[str, str]] = None
 
 
 class SearchResult(BaseModel):
@@ -316,6 +317,7 @@ async def search_documents(
             query_embedding[0],
             k=request.k,
             tag_filter=request.tag_filter,
+            timestamp_filter=request.timestamp_filter,
         )
 
         end_time = time.perf_counter()
