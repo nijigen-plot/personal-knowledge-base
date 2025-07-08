@@ -28,13 +28,13 @@ HISTORY_FILE = "history.txt"
 
 
 class Gemma3Model:
-    def __init__(self, model_type: str = "gguf", model_size: str = "1b"):
+    def __init__(self, model_type: str = "gguf", model_size: str = "4b"):
         """
         Gemma3モデルの統合クラス
 
         Args:
             model_type: "gguf" または "pytorch"
-            model_size: "1b" または "4b" (pytorchの場合のみ)
+            model_size: "1b" または "4b" または "12b" (ggufモデルのみ)
         """
         self.model_type = model_type
         self.model_size = model_size
@@ -49,7 +49,16 @@ class Gemma3Model:
 
     def _load_gguf_model(self):
         """GGUF量子化モデルを読み込み"""
-        model_path = "./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf"
+        if self.model_size == "1b":
+            model_path = "./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf"
+        elif self.model_size == "4b":
+            model_path = "./gemma-3-4b-it-qat-q4_0-gguf/gemma-3-4b-it-q4_0.gguf"
+        elif self.model_size == "12b":
+            model_path = "./gemma-3-12b-it-qat-q4_0-gguf/gemma-3-12b-it-q4_0.gguf"
+        else:
+            raise ValueError(
+                "model_sizeは'1b', '4b', '12b'のいずれかを指定してください"
+            )
         logger.info(f"GGUFモデルを読み込み中: {model_path}")
 
         self.model = Llama(
@@ -57,7 +66,7 @@ class Gemma3Model:
             verbose=False,
             n_ctx=32768,
         )
-        logger.info("GGUFモデルの読み込み完了")
+        logger.info(f"GGUFモデルの読み込み完了: {self.model_size} モデル")
 
     def _load_pytorch_model(self):
         """PyTorchモデルを読み込み"""
@@ -78,7 +87,7 @@ class Gemma3Model:
             device=device,
             torch_dtype="auto",
         )
-        logger.info("PyTorchモデルの読み込み完了")
+        logger.info(f"PyTorchモデルの読み込み完了: {self.model_size} モデル")
 
     def _load_history(self, n_ctx: int = 32768) -> str:
         """会話履歴を読み込み"""
@@ -453,8 +462,8 @@ def main():
     parser.add_argument(
         "--model-size",
         choices=["1b", "4b"],
-        default="1b",
-        help="PyTorchモデルのサイズ (デフォルト: 1b)",
+        default="4b",
+        help="LLMモデルのサイズ (デフォルト: 4b)",
     )
     parser.add_argument(
         "--no-stream", action="store_true", help="ストリーミング出力を無効化"
