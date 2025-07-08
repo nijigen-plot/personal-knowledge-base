@@ -126,7 +126,7 @@ class OpenSearchVectorStore:
                 "knn": {
                     "content_vector": {
                         "vector": query_embedding.tolist(),
-                        "k": k,
+                        "min_score": 0.5,
                     }
                 }
             },
