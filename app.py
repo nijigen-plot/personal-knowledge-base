@@ -300,6 +300,7 @@ async def add_documents_batch(
         raise HTTPException(status_code=500, detail=f"エラー: {str(e)}")
 
 
+# SearchResultのtimestampを使えていない。後程考える
 @app.post("/search", response_model=List[SearchResult])
 async def search_documents(
     request: SearchRequest,
@@ -315,7 +316,7 @@ async def search_documents(
             INDEX_NAME,
             query_embedding[0],
             k=request.k,
-            filter_query=request.tag_filter,
+            tag_filter=request.tag_filter,
         )
 
         end_time = time.perf_counter()
