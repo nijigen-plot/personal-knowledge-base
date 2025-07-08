@@ -117,6 +117,7 @@ class OpenSearchVectorStore:
         query_embedding: np.ndarray,
         k: int = 10,
         tag_filter: Optional[str] = None,
+        timestamp_filter: Optional[dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
 
         search_body = {
@@ -131,11 +132,18 @@ class OpenSearchVectorStore:
             },
         }
 
+        filters = []
         if tag_filter:
+            filters.append({"term": {"tag": tag_filter}})
+
+        if timestamp_filter:
+            filters.append({"range": {"timestamp": timestamp_filter}})
+
+        if filters:
             search_body["query"] = {
                 "bool": {
                     "must": [search_body["query"]],
-                    "filter": {"term": {"tag": tag_filter}},
+                    "filter": filters,
                 }
             }
 
