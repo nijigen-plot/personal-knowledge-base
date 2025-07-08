@@ -1,9 +1,12 @@
 import argparse
 import gc
+import json
 import logging
 import os
+import re
 import time
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from llama_cpp import Llama
@@ -100,11 +103,11 @@ class Gemma3Model:
     def generate(
         self,
         prompt: str,
+        rag_context: Optional[str] = None,
         use_history: bool = True,
         stream: bool = True,
         max_tokens: int = 512,
         temperature: float = 0.3,
-        knowledge_context: Optional[str] = None,
         silent: bool = False,
     ) -> str:
         """
@@ -116,7 +119,6 @@ class Gemma3Model:
             stream: ストリーミング出力するか
             max_tokens: LLM回答の最大トークン数
             temperature: 生成の温度パラメータ
-            knowledge_context: ナレッジベースからの追加情報
             silent: ログ出力を抑制するか（API用）
 
         Returns:
@@ -126,15 +128,25 @@ class Gemma3Model:
 
         # システムプロンプトの構築
         system_content = [
-            {"type": "text", "text": "あなたは日本語を話すAIアシスタントです。"}
+            {
+                "type": "text",
+                "text": f"""
+                あなたは会話アシスタントです。
+                ユーザーの質問に対して、適切な回答を生成してください。
+                また、あなたはRAG（Retrieval-Augmented Generation）と繋がっています。
+                ユーザーがRAGコンテキスト機能を利用した場合は、この後に続いてRAGコンテキストが提供されるので、
+                それを活用して回答を生成してください。
+            """,
+            }
         ]
 
-        # ナレッジベースからの情報を追加
-        if knowledge_context:
+        # RAGコンテキストが提供されている場合は追加
+        if rag_context:
+            logger.info(f"RAGコンテキストが提供されました。{rag_context}")
             system_content.append(
                 {
                     "type": "text",
-                    "text": f"以下の情報を参考にして回答してください：\n{knowledge_context}",
+                    "text": f"RAGコンテキストが提供されました:\n{rag_context}",
                 }
             )
 
@@ -227,6 +239,198 @@ class Gemma3Model:
         gc.collect()
         print("Gemma3モデルのメモリ解放完了")
 
+    def _extract_timestamp_with_regex(self, text: str) -> Optional[Dict[str, str]]:
+        """正規表現を使用してタイムスタンプを抽出"""
+        now = datetime.now(timezone(timedelta(hours=9)))
+
+        # 相対的な時間表現のマッピング
+        time_patterns = {
+            r"今日|きょう": (0, "days"),
+            r"昨日|きのう": (1, "days"),
+            r"一昨日|おととい": (2, "days"),
+            r"最近|近頃": (7, "days"),
+            r"先週|前週": (7, "days"),
+            r"今週|こんしゅう": (0, "days"),
+            r"先月|前月": (30, "days"),
+            r"今月|こんげつ": (0, "days"),
+            r"去年|昨年": (365, "days"),
+            r"今年|こんねん": (0, "days"),
+            r"(\d+)日前": (None, "days"),
+            r"(\d+)週間前": (None, "weeks"),
+            r"(\d+)ヶ月前|(\d+)か月前": (None, "months"),
+            r"(\d+)年前": (None, "years"),
+        }
+
+        for pattern, (days_offset, unit) in time_patterns.items():
+            match = re.search(pattern, text)
+            if match:
+                if days_offset is None:
+                    # 数字を抽出
+                    number = int(match.group(1))
+                    if unit == "days":
+                        start_date = now - timedelta(days=number)
+                    elif unit == "weeks":
+                        start_date = now - timedelta(weeks=number)
+                    elif unit == "months":
+                        start_date = now - timedelta(days=number * 30)
+                    elif unit == "years":
+                        start_date = now - timedelta(days=number * 365)
+                else:
+                    start_date = now - timedelta(days=days_offset)
+
+                # 期間の終了時刻を設定
+                if "今日" in pattern or "きょう" in pattern:
+                    end_date = now
+                elif days_offset == 0:  # 今週、今月、今年
+                    end_date = now
+                else:
+                    end_date = now
+
+                return {
+                    "gte": start_date.strftime("%Y-%m-%dT%H:%M:%S.%f"),
+                    "lte": end_date.strftime("%Y-%m-%dT%H:%M:%S.%f"),
+                }
+
+        return None
+
+    def extract_tag(self, text: str, max_retries: int = 3) -> Dict[str, Any]:
+        """
+        文章からタグとタイムスタンプ期間を抽出
+
+        Args:
+            text: 解析対象の文章
+            max_retries: JSON解析失敗時のリトライ回数
+
+        Returns:
+            {
+                "tag": ["lifestyle", "music", "technology"] のいずれか1個か無し。
+                "timestamp": {
+                    "gte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+                    "lte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+                },
+                "content": "元の文章がここにはいる"
+            }
+        """
+        # まず正規表現でタイムスタンプを抽出
+        timestamp_result = self._extract_timestamp_with_regex(text)
+
+        prompt = f"""以下の文章を分析して、該当するタグを抽出してください。
+
+文章: {text}
+
+抽出ルール:
+1. タグは lifestyle, music, technology のいずれか１つで、何にも該当しない場合はtagのkey valueを含めないでください。
+2. 必ず以下のJSON形式で回答してください：
+
+{{
+  "tag": ["ここに該当するタグを1つだけ入れてください"],
+}}
+
+または、該当するタグがない場合：
+
+{{}}
+
+他の形式での回答は禁止されています。JSONのみ出力してください。"""
+
+        for attempt in range(max_retries):
+            try:
+                response = self.generate(
+                    prompt=prompt,
+                    use_history=False,
+                    stream=False,
+                    max_tokens=512,
+                    temperature=0.1,
+                    silent=False,
+                )
+                print(f"抽出結果 (試行 {attempt + 1}/{max_retries}): {response}")
+
+                # JSONブロックを抽出
+                json_str = self._extract_json_from_response(response)
+                if json_str:
+                    result = json.loads(json_str)
+
+                    # 結果を組み立て
+                    final_result = {"content": text}
+
+                    # タグが含まれていれば追加
+                    if "tag" in result:
+                        final_result["tag"] = result["tag"]
+
+                    # 正規表現で抽出したタイムスタンプを追加
+                    if timestamp_result:
+                        final_result["timestamp"] = timestamp_result
+
+                    # バリデーション
+                    if self._validate_extraction_result(final_result):
+                        print(final_result)
+                        return final_result
+
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.warning(
+                    f"JSON解析エラー (試行 {attempt + 1}/{max_retries}): {e}"
+                )
+                continue
+
+        # 3回リトライした場合はcontentと正規表現抽出結果を返す
+        final_result = {"content": text}
+        if timestamp_result:
+            final_result["timestamp"] = timestamp_result
+        return final_result
+
+    def _extract_json_from_response(self, response: str) -> Optional[str]:
+        """レスポンスからJSONを抽出"""
+        # JSONブロックを抽出
+        json_pattern = r"```json\s*(\{.*?\})\s*```"
+        match = re.search(json_pattern, response, re.DOTALL)
+        if match:
+            return match.group(1)
+
+        # 直接JSONを探す
+        json_pattern = r"(\{.*?\})"
+        match = re.search(json_pattern, response, re.DOTALL)
+        if match:
+            return match.group(1)
+
+        return None
+
+    def _validate_extraction_result(self, result: Dict[str, Any]) -> bool:
+        """抽出結果のバリデーション"""
+        if not isinstance(result, dict):
+            return False
+
+        # contentの検証（必須）
+        if "content" not in result or not isinstance(result["content"], str):
+            return False
+
+        # tagの検証（オプション）
+        if "tag" in result:
+            if not isinstance(result["tag"], list):
+                return False
+            # 1つのタグのみ許容
+            if len(result["tag"]) != 1:
+                return False
+            valid_tags = {"lifestyle", "music", "technology"}
+            if result["tag"][0] not in valid_tags:
+                return False
+
+        # timestampの検証（オプション）
+        if "timestamp" in result:
+            timestamp = result["timestamp"]
+            if timestamp is not None:
+                if not isinstance(timestamp, dict):
+                    return False
+
+                # gteとlteが存在する場合は文字列または null であることを確認
+                if "gte" in timestamp and timestamp["gte"] is not None:
+                    if not isinstance(timestamp["gte"], str):
+                        return False
+
+                if "lte" in timestamp and timestamp["lte"] is not None:
+                    if not isinstance(timestamp["lte"], str):
+                        return False
+
+        return True
+
     def __del__(self):
         """デストラクタでメモリ解放"""
         try:
@@ -260,6 +464,11 @@ def main():
     parser.add_argument(
         "--temperature", type=float, default=0.3, help="生成の温度パラメータ"
     )
+    parser.add_argument(
+        "--extract-tag",
+        action="store_true",
+        help="文章からOpenSearch Filter用のタグとタイムスタンプを抽出",
+    )
 
     args = parser.parse_args()
 
@@ -269,14 +478,19 @@ def main():
     # モデル初期化
     model = Gemma3Model(model_type=args.model_type, model_size=args.model_size)
 
-    # テキスト生成
-    response = model.generate(
-        prompt=args.prompt,
-        use_history=not args.no_history,
-        stream=not args.no_stream,
-        max_tokens=args.max_tokens,
-        temperature=args.temperature,
-    )
+    if args.extract_tag:
+        model.extract_tag(
+            text=args.prompt,
+        )
+    else:
+        # テキスト生成
+        model.generate(
+            prompt=args.prompt,
+            use_history=not args.no_history,
+            stream=not args.no_stream,
+            max_tokens=args.max_tokens,
+            temperature=args.temperature,
+        )
 
 
 if __name__ == "__main__":

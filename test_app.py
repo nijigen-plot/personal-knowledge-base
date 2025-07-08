@@ -50,6 +50,11 @@ def mock_llm_model():
     mock_llm.model_type = "gguf"
     mock_llm.model_size = "1b"
     mock_llm.generate.return_value = "これはLLMからのテスト応答です。"
+    mock_llm.extract_tag.return_value = {
+        "tag": "music",
+        "timestamp": None,
+        "content": "テスト質問",
+    }
     return mock_llm
 
 
@@ -140,7 +145,7 @@ class TestSearchEndpoint:
         # モックが正しいフィルタで呼び出されたことを確認
         mock_vector_store.search.assert_called_once()
         call_args = mock_vector_store.search.call_args
-        assert call_args[1]["filter_query"] == "music"
+        assert call_args[1]["tag_filter"] == "music"
 
     def test_search_missing_query(self, client):
         """クエリパラメータが不足している場合のエラー処理"""
@@ -270,7 +275,6 @@ class TestConversationEndpoint:
             "max_tokens": 256,
             "temperature": 0.5,
             "search_k": 3,
-            "min_score": 0.7,
         }
 
         response = client.post("/conversation", json=conversation_data)
@@ -308,36 +312,28 @@ class TestConversationEndpoint:
         assert call_args[1]["temperature"] == 0.5
         assert call_args[1]["silent"] == True
         # ナレッジコンテキストが生成されていることを確認
-        assert "【参考情報 1】" in call_args[1]["knowledge_context"]
+        assert "【参考情報 1】" in call_args[1]["rag_context"]
 
     def test_conversation_no_relevant_docs(
         self, client, mock_vector_store, mock_llm_model
     ):
         """関連文書が見つからない場合のテスト"""
-        # スコアが低い文書を返すようにモックを設定
-        mock_vector_store.search.return_value = [
-            {
-                "id": "low_score_doc",
-                "score": 0.3,  # min_scoreより低い
-                "content": "関連性の低い文書",
-                "tag": "low_score",
-                "timestamp": "2024-01-01T00:00:00.000000",
-            }
-        ]
+        # 空の検索結果を返すようにモックを設定
+        mock_vector_store.search.return_value = []
 
-        conversation_data = {"question": "関連性のない質問", "min_score": 0.5}
+        conversation_data = {"question": "関連性のない質問"}
 
         response = client.post("/conversation", json=conversation_data)
 
         assert response.status_code == 200
         data = response.json()
 
-        assert data["search_count"] == 0  # フィルタリングされて0件
+        assert data["search_count"] == 0  # 検索結果が0件
         assert data["used_knowledge"] == False
 
         # LLMにはナレッジコンテキストが渡されないことを確認
         call_args = mock_llm_model.generate.call_args
-        assert call_args[1]["knowledge_context"] is None
+        assert call_args[1]["rag_context"] is None
 
     def test_conversation_minimal_request(self, client):
         """最小限のリクエストで会話をテスト"""
@@ -403,5 +399,10 @@ def mock_global_objects():
         mock_llm.model_type = "gguf"
         mock_llm.model_size = "1b"
         mock_llm.generate.return_value = "デフォルトのLLM応答"
+        mock_llm.extract_tag.return_value = {
+            "tag": None,
+            "timestamp": None,
+            "content": "デフォルトの質問",
+        }
 
         yield mock_emb, mock_vec, mock_llm

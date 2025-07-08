@@ -44,6 +44,7 @@ class SearchRequest(BaseModel):
     query: str
     k: Optional[int] = 10
     tag_filter: Optional[Literal["lifestyle", "music", "technology"]] = None
+    timestamp_filter: Optional[dict[str, str]] = None
 
 
 class SearchResult(BaseModel):
@@ -66,7 +67,6 @@ class ConversationRequest(BaseModel):
     max_tokens: Optional[int] = 512
     temperature: Optional[float] = 0.3
     search_k: Optional[int] = 5
-    min_score: Optional[float] = 0.5
 
 
 class ConversationResponse(BaseModel):
@@ -212,6 +212,11 @@ async def root():
     return {"message": "ナレッジベースAPIへようこそ"}
 
 
+@app.head("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
 @app.post("/documents")
 async def add_document(
     request: DocumentRequest,
@@ -295,11 +300,10 @@ async def add_documents_batch(
         raise HTTPException(status_code=500, detail=f"エラー: {str(e)}")
 
 
+# SearchResultのtimestampを使えていない。後程考える
 @app.post("/search", response_model=List[SearchResult])
 async def search_documents(
-    request: SearchRequest,
-    content_type: str = Depends(require_json_content_type),
-    key: str = Depends(verify_api_key),
+    request: SearchRequest, content_type: str = Depends(require_json_content_type)
 ):
     try:
         start_time = time.perf_counter()
@@ -310,7 +314,8 @@ async def search_documents(
             INDEX_NAME,
             query_embedding[0],
             k=request.k,
-            filter_query=request.tag_filter,
+            tag_filter=request.tag_filter,
+            timestamp_filter=request.timestamp_filter,
         )
 
         end_time = time.perf_counter()
@@ -378,30 +383,26 @@ async def conversation_with_rag(
     try:
         total_start_time = time.perf_counter()
 
-        # 1. 質問をEmbeddingモデルでベクトル化
-        search_start_time = time.perf_counter()
+        # 1. 質問からタグとタイムスタンプを抽出
+        extracted_filter = llm_model.extract_tag(text=request.question)
+        # 2. 質問をEmbeddingモデルでベクトル化
         query_embedding = embedding_model.encode([request.question])
 
-        # 2. OpenSearchで近傍探索
+        # 3. OpenSearchで近傍探索
         search_results = vector_store.search(
-            INDEX_NAME, query_embedding[0], k=request.search_k
+            INDEX_NAME,
+            query_embedding[0],
+            k=request.search_k,
+            tag_filter=extracted_filter.get("tag", None),
+            timestamp_filter=extracted_filter.get("timestamp", None),
         )
 
-        # 3. スコアフィルタリング
-        filtered_results = [
-            result
-            for result in search_results
-            if result.get("score", 0) >= request.min_score
-        ]
-
-        search_end_time = time.perf_counter() - search_start_time
-
         # 4. 検索結果をナレッジコンテキストとして整形
-        if filtered_results:
+        if search_results:
             knowledge_context = "\n\n".join(
                 [
                     f"【参考情報 {i+1}】\n{result['content']}"
-                    for i, result in enumerate(filtered_results)
+                    for i, result in enumerate(search_results)
                 ]
             )
             used_knowledge = True
@@ -410,17 +411,15 @@ async def conversation_with_rag(
             used_knowledge = False
 
         # 5. LLMで回答生成
-        llm_start_time = time.perf_counter()
         answer = llm_model.generate(
             prompt=request.question,
+            rag_context=knowledge_context,
             use_history=request.use_history,
             stream=True,  # streamはTrueに固定
             max_tokens=request.max_tokens,
             temperature=request.temperature,
-            knowledge_context=knowledge_context,
             silent=True,  # API用にログ出力を抑制
         )
-        llm_end_time = time.perf_counter() - llm_start_time
 
         total_end_time = time.perf_counter() - total_start_time
 
@@ -433,14 +432,14 @@ async def conversation_with_rag(
                 tag=result["tag"],
                 timestamp=result["timestamp"],
             )
-            for result in filtered_results
+            for result in search_results
         ]
 
         return ConversationResponse(
             question=request.question,
             answer=answer,
             search_results=search_result_models,
-            search_count=len(filtered_results),
+            search_count=len(search_results),
             used_knowledge=used_knowledge,
             processing_time=round(total_end_time, 2),
             model_type=llm_model.model_type,

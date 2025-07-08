@@ -35,6 +35,7 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 ## 過去データの挿入
 
 FastAPI経由でリクエストを送ってデータ挿入が可能
+ADMIN_API_KEYに設定した値をリクエストHeaderのadmin-api-keyの値にすればOK
 
 接続確認
 ```
