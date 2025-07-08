@@ -142,6 +142,7 @@ class Gemma3Model:
 
         # RAGコンテキストが提供されている場合は追加
         if rag_context:
+            logger.info(f"RAGコンテキストが提供されました。{rag_context}")
             system_content.append(
                 {
                     "type": "text",
