@@ -285,7 +285,10 @@ class Gemma3Model:
                 else:
                     end_date = now
 
-                return {"gte": start_date.isoformat(), "lte": end_date.isoformat()}
+                return {
+                    "gte": start_date.strftime("%Y-%m-%dT%H:%M:%S.%f"),
+                    "lte": end_date.strftime("%Y-%m-%dT%H:%M:%S.%f"),
+                }
 
         return None
 
