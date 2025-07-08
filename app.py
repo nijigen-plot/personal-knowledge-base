@@ -212,6 +212,11 @@ async def root():
     return {"message": "ナレッジベースAPIへようこそ"}
 
 
+@app.head("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
 @app.post("/documents")
 async def add_document(
     request: DocumentRequest,
