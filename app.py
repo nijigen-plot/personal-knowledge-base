@@ -303,9 +303,7 @@ async def add_documents_batch(
 # SearchResultのtimestampを使えていない。後程考える
 @app.post("/search", response_model=List[SearchResult])
 async def search_documents(
-    request: SearchRequest,
-    content_type: str = Depends(require_json_content_type),
-    key: str = Depends(verify_api_key),
+    request: SearchRequest, content_type: str = Depends(require_json_content_type)
 ):
     try:
         start_time = time.perf_counter()
