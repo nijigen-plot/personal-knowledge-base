@@ -409,7 +409,7 @@ async def conversation_with_rag(
         if search_results:
             knowledge_context = "\n\n".join(
                 [
-                    f"【参考情報 {i+1}】\n{result['content']}"
+                    f"【参考情報 {i+1}】（{result['timestamp']}）\n{result['content']}"
                     for i, result in enumerate(search_results)
                 ]
             )
