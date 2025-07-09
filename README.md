@@ -15,14 +15,17 @@ Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
 
 ## command flow
 
+結局LLMはOpenAIが安定という結論になったので、デフォルトOPENAI APIを使っています。
+.envに`OPENAPI_API_KEY=`があるのでそれにKEYいれてください。
+
 1. install uv
 2. run `uv sync --all-groups`
-3. get Hugging Face Write access token https://huggingface.co/docs/hub/security-tokens
-4. install [huggingface-cli](https://huggingface.co/docs/huggingface_hub/main/guides/cli)
-5. run `huggingface-cli login`
-6. paste Hugging Face access token
+3. (必須ではない)get Hugging Face Write access token https://huggingface.co/docs/hub/security-tokens
+4. (必須ではない)install [huggingface-cli](https://huggingface.co/docs/huggingface_hub/main/guides/cli)
+5. (必須ではない)run `huggingface-cli login`
+6. (必須ではない)paste Hugging Face access token
 7. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
-8. clone llm repository `git clone git@hf.co:google/gemma-3-1b-it-qat-q4_0-gguf`(Need Write Permission Access Token)
+8. (必須ではない)clone llm repository `git clone git@hf.co:google/gemma-3-1b-it-qat-q4_0-gguf`(Need Write Permission Access Token)
 9. git embedding model repository `git clone git@hf.co:pfnet/plamo-embedding-1b`
 10. run `docker compose up -d` (OpenSearch Server 専用のサーバーがあるのでそっちで立ち上げ済)
 11. run `uv run pytest test_app.py` （単体テスト）
@@ -59,6 +62,50 @@ response = requests.post(
     timeout=30
 )
 ```
+
+## LLMのテスト
+
+普通の会話
+```
+$ uv run python llm.py "こんにちは～あなたのモデルはなんですか？"
+2025-07-09 13:39:51,767 - __main__ - INFO - OpenAI APIクライアントを初期化しました
+2025-07-09 13:39:51,767 - __main__ - INFO - history.txt から過去の会話履歴を読み込みました。
+こんにちは～私はOpenAIのGPT-4oモデルで動作しています。
+2025-07-09 13:39:54,381 - __main__ - INFO - 処理時間: 2.62秒
+言語モデルのメモリを解放中...
+言語モデルのメモリ解放完了
+```
+
+
+RAGを利用した会話
+```
+$ curl -X POST "http://localhost:8050/conversation"     -H "Content-Type: application/json"     -d '{
+      "question": "最近あった出来事は？"
+    }'
+{"question":"最近あった出来事は？","answer":"最近の出来事といえば、曲の最後の詰めをしようとしていたときに、Wavesのプラグインの認証が急に通らなくなってしまったことがありました。ちょっと焦りましたが、PowerShell周りをいじったらなんとか直りました。ただ、Wavesのプラグインの認証周りは本当に勝手が悪くて、もう少しスムーズにいってほしいなと思っています。","search_results":[{"id":"WMFm5ZcBlg4zycrBZ0lN","score":0.78672117,"content":"曲最後の詰めやろうとしたら急にWavesの認証が通らなくなった・・・PowerShell周り弄ったら直ったけど、プラグイン認証周り勝手が悪いんだよなーWavesは","tag":"music","timestamp":"2025-07-05T18:00:00.000000"}],"search_count":1,"used_knowledge":true,"processing_time":6.18,"model_type":"openai","model_size":"4b"}
+```
+
+
+タグ抽出
+```
+$ uv run python llm.py "最近あった音楽関係の出来事は？" --extract-tag
+2025-07-09 13:30:56,142 - __main__ - INFO - OpenAI APIクライアントを初期化しました
+```json
+{
+  "tag": ["music"]
+}
+```
+2025-07-09 13:30:58,831 - __main__ - INFO - 処理時間: 2.69秒
+抽出結果 (試行 1/3): ```json
+{
+  "tag": ["music"]
+}
+```
+{'content': '最近あった音楽関係の出来事は？', 'tag': 'music', 'timestamp': {'gte': '2025-07-02T22:30:56.142483', 'lte': '2025-07-09T22:30:56.142483'}}
+言語モデルのメモリを解放中...
+言語モデルのメモリ解放完了
+```
+
 ## 構成
 
 - OpenSearchは192.168.0.45でホスト（OpenSearch用サーバー）
@@ -72,7 +119,7 @@ response = requests.post(
 
 - Timestamp (自動ではいる)
     - Optionalにして過去文書を入れる時は明示できるようにする
-- タグ(話題が何に関連するものなのか。指定しない場合全て。)
+- タグ(話題が何に関連するものなのか。LLM側でタグを自動で選定してくれる)
     - lifestyle, music, technology
 - 質問文(自由入力)
 
@@ -103,11 +150,15 @@ gemma3.py, embedding_model.pyに内容は記載
 リアルタイムで描画するようにしたらまた評価かわるかも
 google gemma 3 1b ggufはめっちゃ速い 3~5秒くらい。Raspberry Pi 5なら7秒くらい
 
+最終RAGをを分かったこととしては、Gemma 3 1b,4bはRAGのコンテキストを自分として活用するほどの能力はない。
+ということで結局OpenAI API GPT 4oを使っています。
+
 ## i9-9980XE
 
 - 4b -> 10秒程
 - 1b -> 30秒程
 - 1b gguf -> 3秒程
+
 ## Cortex-A76
 
 - 4b -> 40~50秒
