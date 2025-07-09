@@ -67,12 +67,13 @@ class ConversationRequest(BaseModel):
     max_tokens: Optional[int] = 512
     temperature: Optional[float] = 0.3
     search_k: Optional[int] = 5
+    debug: Optional[bool] = False
 
 
 class ConversationResponse(BaseModel):
     question: str
     answer: str
-    search_results: List[SearchResult]
+    search_results: Optional[List[SearchResult]] = None
     search_count: int
     used_knowledge: bool
     processing_time: float
@@ -409,7 +410,7 @@ async def conversation_with_rag(
         if search_results:
             knowledge_context = "\n\n".join(
                 [
-                    f"【参考情報 {i+1}】\n{result['content']}"
+                    f"【参考情報 {i+1}】（{result['timestamp']}）\n{result['content']}"
                     for i, result in enumerate(search_results)
                 ]
             )
@@ -431,17 +432,19 @@ async def conversation_with_rag(
 
         total_end_time = time.perf_counter() - total_start_time
 
-        # 6. 検索結果をSearchResultモデルに変換
-        search_result_models = [
-            SearchResult(
-                id=result["id"],
-                score=result["score"],
-                content=result["content"],
-                tag=result["tag"],
-                timestamp=result["timestamp"],
-            )
-            for result in search_results
-        ]
+        # 6. 検索結果をSearchResultモデルに変換（debug時のみ）
+        search_result_models = None
+        if request.debug:
+            search_result_models = [
+                SearchResult(
+                    id=result["id"],
+                    score=result["score"],
+                    content=result["content"],
+                    tag=result["tag"],
+                    timestamp=result["timestamp"],
+                )
+                for result in search_results
+            ]
 
         return ConversationResponse(
             question=request.question,

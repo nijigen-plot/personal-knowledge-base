@@ -78,6 +78,7 @@ $ uv run python llm.py "こんにちは～あなたのモデルはなんです�
 
 
 RAGを利用した会話
+"debug": trueをbodyにいれるとベクトル検索で引っかかった文書内容も見れるよ
 ```
 $ curl -X POST "http://localhost:8050/conversation"     -H "Content-Type: application/json"     -d '{
       "question": "最近あった出来事は？"
