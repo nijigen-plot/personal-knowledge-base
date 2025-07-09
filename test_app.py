@@ -99,7 +99,18 @@ class TestRootEndpoint:
         """ルートエンドポイントが正しく動作することを確認"""
         response = client.get("/")
         assert response.status_code == 200
-        assert response.json() == {"message": "ナレッジベースAPIへようこそ"}
+        assert response.json() == {
+            "message": "Quarkgabberの個人ナレッジベースAPIへようこそ",
+            "description": "このAPIは、Quarkgabberの日常記録、体験談、知識が蓄積された個人ベクトルデータベースです。",
+            "features": {
+                "embedding_model": "PlamoEmbedding (pfnet/plamo-embedding-1b) による日本語特化ベクトル化",
+                "vector_search": "OpenSearch による高速類似検索とRAG（Retrieval-Augmented Generation）",
+                "ai_conversation": "OpenAI GPT-4o または Gemma 3 による自然な対話生成",
+            },
+            "usage": "'/conversation' エンドポイントで質問を送信すると、関連する記録を検索し、Quarkgabberの体験として一人称で回答します。",
+            "author": "Quarkgabber",
+            "website": "https://quark-hardcore.com/",
+        }
 
 
 class TestSearchEndpoint:
