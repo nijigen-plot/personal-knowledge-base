@@ -9,8 +9,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
+from dotenv import load_dotenv
 from llama_cpp import Llama
+from openai import OpenAI
 from transformers import pipeline
+
+# 環境変数読み込み
+load_dotenv()
 
 # メモリ解放を積極的に行う設定
 os.environ["MALLOC_TRIM_THRESHOLD_"] = "-1"
@@ -27,29 +32,42 @@ logger.addHandler(stream_handler)
 HISTORY_FILE = "history.txt"
 
 
-class Gemma3Model:
-    def __init__(self, model_type: str = "gguf", model_size: str = "1b"):
+class LargeLanguageModel:
+    def __init__(self, model_type: str = "openai", model_size: str = "4b"):
         """
-        Gemma3モデルの統合クラス
+        大規模言語モデルの統合クラス
 
         Args:
-            model_type: "gguf" または "pytorch"
-            model_size: "1b" または "4b" (pytorchの場合のみ)
+            model_type: "openai", "gguf", または "pytorch"
+            model_size: "1b" または "4b" または "12b" (ggufモデルのみ)
         """
         self.model_type = model_type
         self.model_size = model_size
         self.model = None
 
-        if model_type == "gguf":
+        if model_type == "openai":
+            self._load_openai_client()
+        elif model_type == "gguf":
             self._load_gguf_model()
         elif model_type == "pytorch":
             self._load_pytorch_model()
         else:
-            raise ValueError("model_typeは'gguf'または'pytorch'を指定してください")
+            raise ValueError(
+                "model_typeは'openai', 'gguf', または'pytorch'を指定してください"
+            )
 
     def _load_gguf_model(self):
         """GGUF量子化モデルを読み込み"""
-        model_path = "./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf"
+        if self.model_size == "1b":
+            model_path = "./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf"
+        elif self.model_size == "4b":
+            model_path = "./gemma-3-4b-it-qat-q4_0-gguf/gemma-3-4b-it-q4_0.gguf"
+        elif self.model_size == "12b":
+            model_path = "./gemma-3-12b-it-qat-q4_0-gguf/gemma-3-12b-it-q4_0.gguf"
+        else:
+            raise ValueError(
+                "model_sizeは'1b', '4b', '12b'のいずれかを指定してください"
+            )
         logger.info(f"GGUFモデルを読み込み中: {model_path}")
 
         self.model = Llama(
@@ -57,7 +75,7 @@ class Gemma3Model:
             verbose=False,
             n_ctx=32768,
         )
-        logger.info("GGUFモデルの読み込み完了")
+        logger.info(f"GGUFモデルの読み込み完了: {self.model_size} モデル")
 
     def _load_pytorch_model(self):
         """PyTorchモデルを読み込み"""
@@ -78,7 +96,16 @@ class Gemma3Model:
             device=device,
             torch_dtype="auto",
         )
-        logger.info("PyTorchモデルの読み込み完了")
+        logger.info(f"PyTorchモデルの読み込み完了: {self.model_size} モデル")
+
+    def _load_openai_client(self):
+        """OpenAI APIクライアントを初期化"""
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEYが環境変数に設定されていません")
+
+        self.model = OpenAI(api_key=api_key)
+        logger.info("OpenAI APIクライアントを初期化しました")
 
     def _load_history(self, n_ctx: int = 32768) -> str:
         """会話履歴を読み込み"""
@@ -107,7 +134,7 @@ class Gemma3Model:
         use_history: bool = True,
         stream: bool = True,
         max_tokens: int = 512,
-        temperature: float = 0.3,
+        temperature: float = 0.5,
         silent: bool = False,
     ) -> str:
         """
@@ -131,11 +158,9 @@ class Gemma3Model:
             {
                 "type": "text",
                 "text": f"""
-                あなたは会話アシスタントです。
-                ユーザーの質問に対して、適切な回答を生成してください。
-                また、あなたはRAG（Retrieval-Augmented Generation）と繋がっています。
-                ユーザーがRAGコンテキスト機能を利用した場合は、この後に続いてRAGコンテキストが提供されるので、
-                それを活用して回答を生成してください。
+                あなたはQuarkgabberです。
+                以下の記録があなたの過去の体験です。必ずこの情報を使って一人称で答えてください。
+                「私は〜」「僕は〜」のように自分の体験として話してください。
             """,
             }
         ]
@@ -146,7 +171,12 @@ class Gemma3Model:
             system_content.append(
                 {
                     "type": "text",
-                    "text": f"RAGコンテキストが提供されました:\n{rag_context}",
+                    "text": f"""
+                あなたの記録：
+                {rag_context}
+
+                上記の情報を使って、あなた自身の体験として答えてください。
+                """,
                 }
             )
 
@@ -168,7 +198,11 @@ class Gemma3Model:
 
         response_text = ""
 
-        if self.model_type == "gguf":
+        if self.model_type == "openai":
+            response_text = self._generate_openai(
+                messages, stream, max_tokens, temperature, silent
+            )
+        elif self.model_type == "gguf":
             response_text = self._generate_gguf(
                 messages, stream, max_tokens, temperature, silent
             )
@@ -184,6 +218,60 @@ class Gemma3Model:
             self._save_memory(prompt)
 
         return response_text
+
+    def _generate_openai(
+        self,
+        messages: List[Dict[str, Any]],
+        stream: bool,
+        max_tokens: int,
+        temperature: float,
+        silent: bool = False,
+    ) -> str:
+        """OpenAI APIでテキスト生成"""
+        # OpenAI APIのメッセージフォーマットに変換
+        openai_messages = []
+        for message in messages:
+            if message["role"] == "system":
+                # システムメッセージをテキストに変換
+                system_text = ""
+                for content in message["content"]:
+                    system_text += content["text"] + "\n"
+                openai_messages.append({"role": "system", "content": system_text})
+            else:
+                # ユーザーメッセージをテキストに変換
+                user_text = ""
+                for content in message["content"]:
+                    user_text += content["text"] + "\n"
+                openai_messages.append({"role": "user", "content": user_text})
+
+        try:
+            response = self.model.chat.completions.create(
+                model="gpt-4o",
+                messages=openai_messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stream=stream,
+            )
+
+            if stream:
+                partial_message = ""
+                for chunk in response:
+                    if chunk.choices[0].delta.content is not None:
+                        content = chunk.choices[0].delta.content
+                        if not silent:
+                            print(content, end="", flush=True)
+                        partial_message += content
+                if not silent:
+                    print()
+                return partial_message.strip()
+            else:
+                content = response.choices[0].message.content
+                if not silent:
+                    print(content)
+                return content.strip()
+        except Exception as e:
+            logger.error(f"OpenAI API呼び出しエラー: {e}")
+            return f"エラーが発生しました: {e}"
 
     def _generate_gguf(
         self,
@@ -230,14 +318,14 @@ class Gemma3Model:
 
     def clear_memory(self):
         """メモリを明示的に解放"""
-        print("Gemma3モデルのメモリを解放中...")
+        print("言語モデルのメモリを解放中...")
 
         if hasattr(self, "model") and self.model is not None:
             del self.model
 
         # Python ガベージコレクション
         gc.collect()
-        print("Gemma3モデルのメモリ解放完了")
+        print("言語モデルのメモリ解放完了")
 
     def _extract_timestamp_with_regex(self, text: str) -> Optional[Dict[str, str]]:
         """正規表現を使用してタイムスタンプを抽出"""
@@ -404,14 +492,18 @@ class Gemma3Model:
 
         # tagの検証（オプション）
         if "tag" in result:
-            if not isinstance(result["tag"], list):
-                return False
-            # 1つのタグのみ許容
-            if len(result["tag"]) != 1:
-                return False
-            valid_tags = {"lifestyle", "music", "technology"}
-            if result["tag"][0] not in valid_tags:
-                return False
+            # tagが配列の場合は最初の要素を使用
+            if isinstance(result["tag"], list):
+                if len(result["tag"]) > 0:
+                    result["tag"] = result["tag"][0]
+                else:
+                    result["tag"] = None
+
+            # 単一の値として検証
+            if result["tag"] is not None:
+                valid_tags = {"lifestyle", "music", "technology"}
+                if result["tag"] not in valid_tags:
+                    return False
 
         # timestampの検証（オプション）
         if "timestamp" in result:
@@ -440,21 +532,21 @@ class Gemma3Model:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Gemma3統合AIアシスタント")
+    parser = argparse.ArgumentParser(description="大規模言語モデル統合AIアシスタント")
     parser.add_argument(
         "prompt", nargs="?", type=str, help="AIに問い合わせるプロンプト"
     )
     parser.add_argument(
         "--model-type",
-        choices=["gguf", "pytorch"],
-        default="gguf",
-        help="使用するモデルタイプ (デフォルト: gguf)",
+        choices=["openai", "gguf", "pytorch"],
+        default="openai",
+        help="使用するモデルタイプ (デフォルト: openai)",
     )
     parser.add_argument(
         "--model-size",
         choices=["1b", "4b"],
-        default="1b",
-        help="PyTorchモデルのサイズ (デフォルト: 1b)",
+        default="4b",
+        help="LLMモデルのサイズ (デフォルト: 4b)",
     )
     parser.add_argument(
         "--no-stream", action="store_true", help="ストリーミング出力を無効化"
@@ -473,10 +565,13 @@ def main():
     args = parser.parse_args()
 
     if not args.prompt:
-        args.prompt = "こんにちは～あなたが駆動しているモデルを教えてください"
+        if args.model_type == "openai":
+            args.prompt = "こんにちは～あなたが駆動しているモデルを教えてください（OpenAI GPT-4o）"
+        else:
+            args.prompt = "こんにちは～あなたが駆動しているモデルを教えてください"
 
     # モデル初期化
-    model = Gemma3Model(model_type=args.model_type, model_size=args.model_size)
+    model = LargeLanguageModel(model_type=args.model_type, model_size=args.model_size)
 
     if args.extract_tag:
         model.extract_tag(

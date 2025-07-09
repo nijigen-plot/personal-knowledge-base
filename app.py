@@ -10,7 +10,7 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, field_validator
 
 from embedding_model import PlamoEmbedding
-from gemma3 import Gemma3Model
+from llm import LargeLanguageModel
 from opensearch_client import OpenSearchVectorStore
 
 load_dotenv(".env")
@@ -111,10 +111,7 @@ async def lifespan(app: FastAPI):
     embedding_dim = embedding_model.get_embedding_dimension()
     vector_store.create_index(INDEX_NAME, embedding_dim)
 
-    # LLMモデル初期化（デフォルト：GGUF）
-    llm_model_type = os.getenv("LLM_MODEL_TYPE", "gguf")
-    llm_model_size = os.getenv("LLM_MODEL_SIZE", "1b")
-    llm_model = Gemma3Model(model_type=llm_model_type, model_size=llm_model_size)
+    llm_model = LargeLanguageModel()
 
     print("ナレッジベースAPI初期化完了")
     yield
@@ -209,7 +206,18 @@ def verify_api_key(api_key: str = Depends(header_scheme)):
 
 @app.get("/")
 async def root():
-    return {"message": "ナレッジベースAPIへようこそ"}
+    return {
+        "message": "Quarkgabberの個人ナレッジベースAPIへようこそ",
+        "description": "このAPIは、Quarkgabberの日常記録、体験談、知識が蓄積された個人ベクトルデータベースです。",
+        "features": {
+            "embedding_model": "PlamoEmbedding (pfnet/plamo-embedding-1b) による日本語特化ベクトル化",
+            "vector_search": "OpenSearch による高速類似検索とRAG（Retrieval-Augmented Generation）",
+            "ai_conversation": "OpenAI GPT-4o または Gemma 3 による自然な対話生成",
+        },
+        "usage": "'/conversation' エンドポイントで質問を送信すると、関連する記録を検索し、Quarkgabberの体験として一人称で回答します。",
+        "author": "Quarkgabber",
+        "website": "https://quark-hardcore.com/",
+    }
 
 
 @app.head("/health")
