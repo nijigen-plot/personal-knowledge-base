@@ -472,9 +472,9 @@ class LargeLanguageModel:
                     # 結果を組み立て
                     final_result = {"content": text}
 
-                    # タグが含まれていれば追加
-                    if "tag" in result:
-                        final_result["tag"] = result["tag"]
+                    # タグが含まれていれば追加→タグをつけるほどの量が今の所ないので、tagは無し
+                    # if "tag" in result:
+                    # final_result["tag"] = result["tag"]
 
                     # 正規表現で抽出したタイムスタンプを追加
                     if timestamp_result:
