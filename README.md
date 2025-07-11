@@ -1,4 +1,9 @@
-Run the [Gemma3](https://huggingface.co/google/gemma-3-4b-it) Model for local.
+# これはなに
+
+nijigen-plot(Quarkgabber)のナレッジベースです。
+2012年からの過去ツイートと、2025年からちょいちょい入れてる日常系データをRAGとしています。
+
+![アーキテクチャ図](./architecture.png)
 
 # Setup
 
