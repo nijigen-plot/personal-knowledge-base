@@ -1,43 +1,25 @@
 import os
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import APIKeyHeader
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 from embedding_model import PlamoEmbedding
 from llm import LargeLanguageModel
 from opensearch_client import OpenSearchVectorStore
 
 load_dotenv(".env")
-JST = timezone(timedelta(hours=9), name="JST")
 
 
 class DocumentRequest(BaseModel):
     content: str
-    timestamp: Optional[str] = None
+    timestamp: str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
     tag: Literal["lifestyle", "music", "technology"]
-
-    @field_validator("timestamp")
-    @classmethod
-    def validate_timestamp(cls, v):
-        if v is None:
-            # OpenSearchの期待するフォーマット: yyyy-MM-dd'T'HH:mm:ss.SSSSSS
-            return datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S.%f")
-
-        # OpenSearchのタイムスタンプフォーマットをバリデーション
-        try:
-            # yyyy-MM-dd'T'HH:mm:ss.SSSSSS の形式をチェック
-            datetime.strptime(v, "%Y-%m-%dT%H:%M:%S.%f")
-            return v
-        except ValueError:
-            raise ValueError(
-                'timestamp must be in OpenSearch format: "yyyy-MM-ddTHH:mm:ss.SSSSSS" (e.g., "2024-01-01T10:00:00.123456")'
-            )
 
 
 class SearchRequest(BaseModel):
