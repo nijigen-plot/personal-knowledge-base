@@ -6,7 +6,7 @@ from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
-from fastapi.security import APIKeyHeader
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from embedding_model import PlamoEmbedding
@@ -113,7 +113,7 @@ app = FastAPI(
 
 ### RAG会話
 ```bash
-curl -X POST "https://home.quark-hardcore/personal-knowledge-base/conversation" \
+curl -X POST "https://home.quark-hardcore/personal-knowledge-base/api/v1/conversation" \
   -H "Content-Type: application/json" \
   -d '{"question": "最近あった出来事は？"}'
 ```
@@ -154,10 +154,9 @@ curl -X POST "https://home.quark-hardcore/personal-knowledge-base/conversation" 
     ],
 )
 
-header_scheme = APIKeyHeader(
-    name="admin-api-key",
-    scheme_name="Admin API Key",
-    description="一部アクセスを制限するためのAPIキー",
+security = HTTPBearer(
+    scheme_name="Bearer Token",
+    description="AdminだけがリクエストできるAPIにアクセスするためのキーを設定",
     auto_error=True,
 )
 
@@ -183,8 +182,8 @@ def check_api_key(api_key: Optional[str]) -> Optional[str]:
     return api_key
 
 
-def verify_api_key(api_key: str = Depends(header_scheme)):
-    return check_api_key(api_key)
+def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    return check_api_key(credentials.credentials)
 
 
 # APIルーターを作成
