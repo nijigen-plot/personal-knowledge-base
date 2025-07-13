@@ -19,6 +19,7 @@ dependencies = [
     "sentencepiece>=0.2.0",
     "huggingface-hub[cli]>=0.32.4",
     "openai>=1.0.0",
+    "streamlit>=1.46.1",
 ]
 
 [dependency-groups]
