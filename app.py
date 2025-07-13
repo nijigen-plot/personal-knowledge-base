@@ -131,28 +131,24 @@ curl -X POST "https://home.quark-hardcore/personal-knowledge-base/api/v1/convers
     openapi_url="/api/v1/openapi.json",
     openapi_tags=[
         {
-            "name": "documents",
-            "description": "ドキュメントの追加",
+            "name": "system",
+            "description": "システム情報",
         },
         {
-            "name": "documents/batch",
-            "description": "ドキュメントの一括追加",
+            "name": "documents",
+            "description": "ドキュメント管理",
         },
         {
             "name": "search",
-            "description": "OpenSearchへの検索リクエスト",
+            "description": "ベクトル検索",
         },
         {
             "name": "conversation",
-            "description": "LLM+RAGによる私との会話",
+            "description": "RAG会話",
         },
         {
-            "name": "index",
-            "description": "indexの削除",
-        },
-        {
-            "name": "stats",
-            "description": "インデックスの文書量等統計情報",
+            "name": "admin",
+            "description": "管理機能",
         },
     ],
 )
@@ -193,7 +189,7 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)
 api_router = APIRouter(prefix="/api/v1")
 
 
-@api_router.get("/")
+@api_router.get("/", tags=["system"])
 async def root():
     return {
         "message": "Quarkgabberの個人ナレッジベースAPIへようこそ",
@@ -209,12 +205,12 @@ async def root():
     }
 
 
-@api_router.head("/health")
+@api_router.head("/health", tags=["system"])
 async def health_check():
     return {"status": "ok"}
 
 
-@api_router.post("/documents")
+@api_router.post("/documents", tags=["documents"])
 async def add_document(
     request: DocumentRequest,
     content_type: str = Depends(require_json_content_type),
@@ -251,7 +247,7 @@ async def add_document(
         raise HTTPException(status_code=500, detail=f"エラー: {str(e)}")
 
 
-@api_router.post("/documents/batch")
+@api_router.post("/documents/batch", tags=["documents"])
 async def add_documents_batch(
     requests: List[DocumentRequest],
     content_type: str = Depends(require_json_content_type),
@@ -298,7 +294,7 @@ async def add_documents_batch(
 
 
 # SearchResultのtimestampを使えていない。後程考える
-@api_router.post("/search", response_model=List[SearchResult])
+@api_router.post("/search", response_model=List[SearchResult], tags=["search"])
 async def search_documents(
     request: SearchRequest, content_type: str = Depends(require_json_content_type)
 ):
@@ -334,7 +330,7 @@ async def search_documents(
         raise HTTPException(status_code=500, detail=f"検索エラー: {str(e)}")
 
 
-@api_router.get("/stats", response_model=IndexStats)
+@api_router.get("/stats", response_model=IndexStats, tags=["admin"])
 async def get_index_stats(key: str = Depends(verify_api_key)):
     try:
         stats = vector_store.get_index_stats(INDEX_NAME)
@@ -354,7 +350,7 @@ async def get_index_stats(key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=500, detail=f"統計取得エラー: {str(e)}")
 
 
-@api_router.delete("/index")
+@api_router.delete("/index", tags=["admin"])
 async def reset_index(key: str = Depends(verify_api_key)):
     try:
         vector_store.delete_index(INDEX_NAME)
@@ -370,7 +366,7 @@ async def reset_index(key: str = Depends(verify_api_key)):
         )
 
 
-@api_router.delete("/documents/{document_id}")
+@api_router.delete("/documents/{document_id}", tags=["documents"])
 async def delete_document(document_id: str, key: str = Depends(verify_api_key)):
     """特定のドキュメントIDのドキュメントを削除"""
     try:
@@ -390,7 +386,9 @@ async def delete_document(document_id: str, key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=500, detail=f"ドキュメント削除エラー: {str(e)}")
 
 
-@api_router.post("/conversation", response_model=ConversationResponse)
+@api_router.post(
+    "/conversation", response_model=ConversationResponse, tags=["conversation"]
+)
 async def conversation_with_rag(
     request: ConversationRequest, content_type: str = Depends(require_json_content_type)
 ):
