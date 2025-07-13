@@ -1,9 +1,25 @@
 # これはなに
 
-nijigen-plot(Quarkgabber)のナレッジベースです。
+[nijigen-plot](https://x.com/nijigen_plot)([Quarkgabber](https://x.com/Quarkgabber))のナレッジベースです。
 2012年からの過去ツイートと、2025年からちょいちょい入れてる日常系データをRAGとしています。
 
 ![アーキテクチャ図](./architecture.png)
+
+# 使い方
+
+## StreamlitチャットBOT
+
+質問に対する回答(conversation API)をしてくれるアプリ
+
+https://home.quark-hardcore.com/personal-knowledge-base/app/
+
+<img width="998" height="613" alt="Image" src="https://github.com/user-attachments/assets/f0420ba5-3062-456c-9d2b-69a1401a598c" />
+
+## API(あとでかく)
+
+Openapiのjsonをproxy設定で見れるようにする必要有
+
+## MCP(Coming soon...)
 
 # Setup
 
@@ -32,13 +48,17 @@ nijigen-plot(Quarkgabber)のナレッジベースです。
 7. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
 8. (必須ではない)clone llm repository `git clone git@hf.co:google/gemma-3-1b-it-qat-q4_0-gguf`(Need Write Permission Access Token)
 9. git embedding model repository `git clone git@hf.co:pfnet/plamo-embedding-1b`
-10. run `docker compose up -d` (OpenSearch Server 専用のサーバーがあるのでそっちで立ち上げ済)
+10. run `docker compose up -d` (OpenSearch Server 専用のサーバー 192.168.0.45があるのでそっちで立ち上げ済)
 11. run `uv run pytest test_app.py` （単体テスト）
 12. run `uv run uvicorn app:app --reload --port $APP_PORT --host $APP_HOST` or `uv run python app.py`(FastAPI立ち上げ)
+13. run `uv run streamlit run streamlit_app.py --server.port 8502` (192.168.0.44 チャットBOT用Streamlit立ち上げ)
 
 
 ### daemon
-`/etc/systemd/system/personal-knowledge-base-fastapi.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
+- 192.168.0.46 : `/etc/systemd/system/personal-knowledge-base-fastapi.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
+- 192.168.0.44 : `/etc/systemd/system/personal-knowledge-base-streamlit.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
+
+### Apache mod_proxy
 
 ## 過去データの挿入
 
