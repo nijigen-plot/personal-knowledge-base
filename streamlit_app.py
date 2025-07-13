@@ -7,7 +7,7 @@ import streamlit as st
 
 
 def post_conversation(prompt: str) -> Generator[str, None, None]:
-    url = "https://home.quark-hardcore.com/personal-knowledge-base/conversation"
+    url = "https://home.quark-hardcore.com/personal-knowledge-base/api/v1/conversation"
     try:
         response = requests.post(
             url,
