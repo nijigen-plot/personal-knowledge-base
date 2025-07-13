@@ -126,6 +126,9 @@ curl -X POST "https://home.quark-hardcore/personal-knowledge-base/api/v1/convers
     """,
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
+    openapi_url="/api/v1/openapi.json",
     openapi_tags=[
         {
             "name": "documents",
