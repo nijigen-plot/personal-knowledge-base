@@ -15,9 +15,14 @@ https://home.quark-hardcore.com/personal-knowledge-base/app/
 
 <img width="998" height="613" alt="Image" src="https://github.com/user-attachments/assets/f0420ba5-3062-456c-9d2b-69a1401a598c" />
 
-## API(あとでかく)
+## API
 
-Openapiのjsonをproxy設定で見れるようにする必要有
+以下API Docsを参照してください
+
+- https://home.quark-hardcore.com/personal-knowledge-base/api/v1/docs
+- https://home.quark-hardcore.com/personal-knowledge-base/api/v1/redoc
+
+
 
 ## MCP(Coming soon...)
 
