@@ -103,7 +103,7 @@ class TestRootEndpoint:
 
     def test_root_endpoint(self, client):
         """ルートエンドポイントが正しく動作することを確認"""
-        response = client.get("/")
+        response = client.get("/api/v1/")
         assert response.status_code == 200
         assert response.json() == {
             "message": "Quarkgabberの個人ナレッジベースAPIへようこそ",

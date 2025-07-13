@@ -190,7 +190,7 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)
 api_router = APIRouter(prefix="/api/v1")
 
 
-@app.get("/")
+@api_router.get("/")
 async def root():
     return {
         "message": "Quarkgabberの個人ナレッジベースAPIへようこそ",
@@ -206,7 +206,7 @@ async def root():
     }
 
 
-@app.head("/health")
+@api_router.head("/health")
 async def health_check():
     return {"status": "ok"}
 
