@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
@@ -187,6 +187,10 @@ def verify_api_key(api_key: str = Depends(header_scheme)):
     return check_api_key(api_key)
 
 
+# APIルーターを作成
+api_router = APIRouter(prefix="/api/v1")
+
+
 @app.get("/")
 async def root():
     return {
@@ -208,7 +212,7 @@ async def health_check():
     return {"status": "ok"}
 
 
-@app.post("/documents")
+@api_router.post("/documents")
 async def add_document(
     request: DocumentRequest,
     content_type: str = Depends(require_json_content_type),
@@ -245,7 +249,7 @@ async def add_document(
         raise HTTPException(status_code=500, detail=f"エラー: {str(e)}")
 
 
-@app.post("/documents/batch")
+@api_router.post("/documents/batch")
 async def add_documents_batch(
     requests: List[DocumentRequest],
     content_type: str = Depends(require_json_content_type),
@@ -292,7 +296,7 @@ async def add_documents_batch(
 
 
 # SearchResultのtimestampを使えていない。後程考える
-@app.post("/search", response_model=List[SearchResult])
+@api_router.post("/search", response_model=List[SearchResult])
 async def search_documents(
     request: SearchRequest, content_type: str = Depends(require_json_content_type)
 ):
@@ -328,7 +332,7 @@ async def search_documents(
         raise HTTPException(status_code=500, detail=f"検索エラー: {str(e)}")
 
 
-@app.get("/stats", response_model=IndexStats)
+@api_router.get("/stats", response_model=IndexStats)
 async def get_index_stats(key: str = Depends(verify_api_key)):
     try:
         stats = vector_store.get_index_stats(INDEX_NAME)
@@ -348,7 +352,7 @@ async def get_index_stats(key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=500, detail=f"統計取得エラー: {str(e)}")
 
 
-@app.delete("/index")
+@api_router.delete("/index")
 async def reset_index(key: str = Depends(verify_api_key)):
     try:
         vector_store.delete_index(INDEX_NAME)
@@ -364,7 +368,7 @@ async def reset_index(key: str = Depends(verify_api_key)):
         )
 
 
-@app.post("/conversation", response_model=ConversationResponse)
+@api_router.post("/conversation", response_model=ConversationResponse)
 async def conversation_with_rag(
     request: ConversationRequest, content_type: str = Depends(require_json_content_type)
 ):
@@ -441,6 +445,10 @@ async def conversation_with_rag(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"会話生成エラー: {str(e)}")
+
+
+# APIルーターをアプリに追加
+app.include_router(api_router)
 
 
 if __name__ == "__main__":
