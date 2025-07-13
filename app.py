@@ -45,10 +45,10 @@ class IndexStats(BaseModel):
 
 class ConversationRequest(BaseModel):
     question: str
-    use_history: Optional[bool] = True
+    use_history: Optional[bool] = False
     max_tokens: Optional[int] = 512
-    temperature: Optional[float] = 0.3
-    search_k: Optional[int] = 5
+    temperature: Optional[float] = 0.7
+    search_k: Optional[int] = 10
     debug: Optional[bool] = False
 
 
