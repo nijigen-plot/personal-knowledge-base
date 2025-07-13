@@ -165,6 +165,24 @@ class OpenSearchVectorStore:
         print(f"検索完了: {len(results)}件ヒット、{end_time - start_time:.2f}秒")
         return results
 
+    def delete_document(self, index_name: str, document_id: str) -> Dict[str, Any]:
+        """特定のドキュメントIDのドキュメントを削除"""
+        try:
+            if not self.client.indices.exists(index_name):
+                return {"error": f"インデックスが存在しません: {index_name}"}
+
+            response = self.client.delete(index=index_name, id=document_id)
+            print(f"ドキュメント削除完了: {document_id}")
+            return {
+                "message": f"ドキュメント {document_id} を削除しました",
+                "result": response["result"],
+            }
+        except Exception as e:
+            if "not_found" in str(e).lower():
+                return {"error": f"ドキュメントが見つかりません: {document_id}"}
+            else:
+                return {"error": f"削除エラー: {str(e)}"}
+
     def delete_index(self, index_name: str):
         if self.client.indices.exists(index_name):
             self.client.indices.delete(index_name)

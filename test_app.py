@@ -40,6 +40,10 @@ def mock_vector_store():
         "size_bytes": 1024,
         "size_mb": 0.001,
     }
+    mock_store.delete_document.return_value = {
+        "message": "ドキュメント test_doc_1 を削除しました",
+        "result": "deleted",
+    }
     return mock_store
 
 
@@ -86,7 +90,9 @@ def client(mock_embedding_model, mock_vector_store, mock_llm_model):
     ):
         # TestClientはresponseコードを自動で返す
         with TestClient(test_app) as test_client:
-            test_client.headers.update({"admin-api-key": os.getenv("ADMIN_API_KEY")})
+            # Bearer Token認証に変更
+            api_key = os.getenv("ADMIN_API_KEY", "test-api-key")
+            test_client.headers.update({"Authorization": f"Bearer {api_key}"})
             # yieldにすることで、テスト後にAPIやDB接続を閉じることができる。今回はFastAPIのTestClientを使っているので、yieldでなくてもいい。
             yield test_client
 
@@ -97,7 +103,7 @@ class TestRootEndpoint:
 
     def test_root_endpoint(self, client):
         """ルートエンドポイントが正しく動作することを確認"""
-        response = client.get("/")
+        response = client.get("/api/v1/")
         assert response.status_code == 200
         assert response.json() == {
             "message": "Quarkgabberの個人ナレッジベースAPIへようこそ",
@@ -118,7 +124,7 @@ class TestSearchEndpoint:
 
     def test_search_success(self, client, mock_embedding_model, mock_vector_store):
         """正常な検索が動作することを確認"""
-        response = client.post("/search", json={"query": "テスト", "k": 5})
+        response = client.post("/api/v1/search", json={"query": "テスト", "k": 5})
 
         if response.status_code != 200:
             print(f"Response status: {response.status_code}")
@@ -146,7 +152,7 @@ class TestSearchEndpoint:
         """フィルタクエリが動作することを確認"""
         # フィルタ付きの検索リクエスト
         response = client.post(
-            "/search",
+            "/api/v1/search",
             json={"query": "テスト", "k": 10, "tag_filter": "music"},
         )
 
@@ -160,12 +166,12 @@ class TestSearchEndpoint:
 
     def test_search_missing_query(self, client):
         """クエリパラメータが不足している場合のエラー処理"""
-        response = client.post("/search", json={})
+        response = client.post("/api/v1/search", json={})
         assert response.status_code == 422  # バリデーションエラー
 
     def test_search_default_parameters(self, client):
         """デフォルトパラメータでの検索が動作することを確認"""
-        response = client.post("/search", json={"query": "テスト"})
+        response = client.post("/api/v1/search", json={"query": "テスト"})
 
         assert response.status_code == 200
         data = response.json()
@@ -184,7 +190,7 @@ class TestAddEndpoint:
             "tag": "technology",
         }
 
-        response = client.post("/documents", json=document_data)
+        response = client.post("/api/v1/documents", json=document_data)
 
         assert response.status_code == 200
         data = response.json()
@@ -202,14 +208,14 @@ class TestAddEndpoint:
         """最小限のデータでドキュメント追加"""
         document_data = {"content": "最小限のドキュメント", "tag": "lifestyle"}
 
-        response = client.post("/documents", json=document_data)
+        response = client.post("/api/v1/documents", json=document_data)
         assert response.status_code == 200
 
     def test_add_document_missing_content(self, client):
         """コンテンツが不足している場合のエラー処理"""
         document_data = {"tag": "music"}
 
-        response = client.post("/documents", json=document_data)
+        response = client.post("/api/v1/documents", json=document_data)
         assert response.status_code == 422  # バリデーションエラー
 
     def test_add_document_storage_failure(self, client, mock_vector_store):
@@ -219,7 +225,7 @@ class TestAddEndpoint:
 
         document_data = {"content": "失敗するドキュメント", "tag": "music"}
 
-        response = client.post("/documents", json=document_data)
+        response = client.post("/api/v1/documents", json=document_data)
         assert response.status_code == 500
         assert "ドキュメントの保存に失敗しました" in response.json()["detail"]
 
@@ -229,7 +235,7 @@ class TestStatsEndpoint:
 
     def test_get_stats_success(self, client, mock_vector_store):
         """正常な統計取得が動作することを確認"""
-        response = client.get("/stats")
+        response = client.get("/api/v1/stats")
 
         assert response.status_code == 200
         data = response.json()
@@ -248,7 +254,7 @@ class TestStatsEndpoint:
             "error": "インデックスが見つかりません"
         }
 
-        response = client.get("/stats")
+        response = client.get("/api/v1/stats")
         assert response.status_code == 404
 
 
@@ -259,7 +265,7 @@ class TestErrorHandling:
         """エンベディング生成エラーの処理"""
         mock_embedding_model.encode.side_effect = Exception("エンベディングエラー")
 
-        response = client.post("/search", json={"query": "エラーテスト"})
+        response = client.post("/api/v1/search", json={"query": "エラーテスト"})
         assert response.status_code == 500
         assert "検索エラー" in response.json()["detail"]
 
@@ -268,7 +274,7 @@ class TestErrorHandling:
         mock_embedding_model.encode.side_effect = Exception("エンベディングエラー")
 
         document_data = {"content": "エラーテストドキュメント", "tag": "technology"}
-        response = client.post("/documents", json=document_data)
+        response = client.post("/api/v1/documents", json=document_data)
 
         assert response.status_code == 500
         assert "エラー" in response.json()["detail"]
@@ -288,7 +294,7 @@ class TestConversationEndpoint:
             "search_k": 3,
         }
 
-        response = client.post("/conversation", json=conversation_data)
+        response = client.post("/api/v1/conversation", json=conversation_data)
 
         if response.status_code != 200:
             print(f"Response status: {response.status_code}")
@@ -334,7 +340,7 @@ class TestConversationEndpoint:
 
         conversation_data = {"question": "関連性のない質問"}
 
-        response = client.post("/conversation", json=conversation_data)
+        response = client.post("/api/v1/conversation", json=conversation_data)
 
         assert response.status_code == 200
         data = response.json()
@@ -350,7 +356,7 @@ class TestConversationEndpoint:
         """最小限のリクエストで会話をテスト"""
         conversation_data = {"question": "テスト質問"}
 
-        response = client.post("/conversation", json=conversation_data)
+        response = client.post("/api/v1/conversation", json=conversation_data)
 
         if response.status_code != 200:
             print(f"Response status: {response.status_code}")
@@ -362,7 +368,7 @@ class TestConversationEndpoint:
         """質問が不足している場合のエラー処理"""
         conversation_data = {"max_tokens": 256}
 
-        response = client.post("/conversation", json=conversation_data)
+        response = client.post("/api/v1/conversation", json=conversation_data)
         assert response.status_code == 422  # バリデーションエラー
 
     def test_conversation_embedding_error(self, client, mock_embedding_model):
@@ -370,7 +376,7 @@ class TestConversationEndpoint:
         mock_embedding_model.encode.side_effect = Exception("Embeddingエラー")
 
         conversation_data = {"question": "エラーテスト"}
-        response = client.post("/conversation", json=conversation_data)
+        response = client.post("/api/v1/conversation", json=conversation_data)
 
         assert response.status_code == 500
         assert "会話生成エラー" in response.json()["detail"]
@@ -380,10 +386,68 @@ class TestConversationEndpoint:
         mock_llm_model.generate.side_effect = Exception("LLMエラー")
 
         conversation_data = {"question": "エラーテスト"}
-        response = client.post("/conversation", json=conversation_data)
+        response = client.post("/api/v1/conversation", json=conversation_data)
 
         assert response.status_code == 500
         assert "会話生成エラー" in response.json()["detail"]
+
+
+class TestDeleteDocumentEndpoint:
+    """ドキュメント削除エンドポイントのテスト"""
+
+    def test_delete_document_success(self, client, mock_vector_store):
+        """正常なドキュメント削除が動作することを確認"""
+        document_id = "test_doc_1"
+        response = client.delete(f"/api/v1/documents/{document_id}")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # レスポンスの内容を確認
+        assert data["message"] == "ドキュメント test_doc_1 を削除しました"
+        assert data["result"] == "deleted"
+
+        # モックが正しく呼び出されたことを確認
+        mock_vector_store.delete_document.assert_called_once_with(
+            "knowledge-base", document_id
+        )
+
+    def test_delete_document_not_found(self, client, mock_vector_store):
+        """存在しないドキュメントの削除エラー処理"""
+        # ドキュメントが見つからない場合をシミュレート
+        mock_vector_store.delete_document.return_value = {
+            "error": "ドキュメントが見つかりません: nonexistent_doc"
+        }
+
+        document_id = "nonexistent_doc"
+        response = client.delete(f"/api/v1/documents/{document_id}")
+
+        assert response.status_code == 404
+        assert "ドキュメントが見つかりません" in response.json()["detail"]
+
+    def test_delete_document_server_error(self, client, mock_vector_store):
+        """削除時のサーバーエラー処理"""
+        # サーバーエラーをシミュレート
+        mock_vector_store.delete_document.return_value = {
+            "error": "削除エラー: サーバー内部エラー"
+        }
+
+        document_id = "error_doc"
+        response = client.delete(f"/api/v1/documents/{document_id}")
+
+        assert response.status_code == 500
+        assert "削除エラー" in response.json()["detail"]
+
+    def test_delete_document_exception(self, client, mock_vector_store):
+        """削除時の例外処理"""
+        # 例外をシミュレート
+        mock_vector_store.delete_document.side_effect = Exception("予期しないエラー")
+
+        document_id = "exception_doc"
+        response = client.delete(f"/api/v1/documents/{document_id}")
+
+        assert response.status_code == 500
+        assert "ドキュメント削除エラー" in response.json()["detail"]
 
 
 # 実際のAPIが起動していない状態でのテスト実行時の設定
@@ -405,6 +469,10 @@ def mock_global_objects():
             "document_count": 0,
             "size_bytes": 0,
             "size_mb": 0.0,
+        }
+        mock_vec.delete_document.return_value = {
+            "message": "ドキュメント default_doc を削除しました",
+            "result": "deleted",
         }
 
         mock_llm.model_type = "gguf"
