@@ -51,12 +51,13 @@ Openapiのjsonをproxy設定で見れるようにする必要有
 10. run `docker compose up -d` (OpenSearch Server 専用のサーバー 192.168.0.45があるのでそっちで立ち上げ済)
 11. run `uv run pytest test_app.py` （単体テスト）
 12. run `uv run uvicorn app:app --reload --port $APP_PORT --host $APP_HOST` or `uv run python app.py`(FastAPI立ち上げ)
-13. run `uv run streamlit run streamlit_app.py --server.port 8502` (192.168.0.44 チャットBOT用Streamlit立ち上げ)
+13. run `uv run streamlit run streamlit_app.py --server.port $STREAMLIT_APP_PORT` (192.168.0.44 チャットBOT用Streamlit立ち上げ)
 
 
 ### daemon
 - 192.168.0.46 : `/etc/systemd/system/personal-knowledge-base-fastapi.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
 - 192.168.0.44 : `/etc/systemd/system/personal-knowledge-base-streamlit.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
+    - `start_streamlit.sh`をdaemonで実行している
 
 ### Apache mod_proxy
 
