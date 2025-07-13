@@ -27,7 +27,7 @@ def post_conversation(prompt: str) -> Generator[str, None, None]:
         time.sleep(0.02)
 
 
-st.title("[Quarkgabber](https://quark-hardcore.com/)のパーソナルナレッジベース")
+st.title("[Quarkgabber](https://quark-hardcore.com/)のナレッジベース")
 st.markdown(
     """
     なんでも質問OK！2012年からのTwitter情報や定期的に記録している情報をもとに、あなたの質問に答えます。\n
