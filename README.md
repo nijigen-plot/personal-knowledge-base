@@ -64,7 +64,7 @@ Openapiのjsonをproxy設定で見れるようにする必要有
 ## 過去データの挿入
 
 FastAPI経由でリクエストを送ってデータ挿入が可能
-ADMIN_API_KEYに設定した値をリクエストHeaderのadmin-api-keyの値にすればOK
+ADMIN_API_KEYに設定した値をBearer Tokenとして認証が必要
 
 接続確認
 ```
@@ -80,11 +80,14 @@ content-type: application/json
 
 データ挿入
 ```
-url = f"http://localhost:8050/documents"
+url = f"http://localhost:8050/api/v1/documents"
 response = requests.post(
     url,
     json=data,
-    headers={"Content-Type": "application/json"},
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {ADMIN_API_KEY}"
+    },
     timeout=30
 )
 ```
@@ -106,7 +109,10 @@ $ uv run python llm.py "こんにちは～あなたのモデルはなんです�
 RAGを利用した会話
 "debug": trueをbodyにいれるとベクトル検索で引っかかった文書内容も見れるよ
 ```
-$ curl -X POST "http://localhost:8050/conversation"     -H "Content-Type: application/json"     -d '{
+$ curl -X POST "http://localhost:8050/api/v1/conversation" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer ADMIN_API_KEY" \
+    -d '{
       "question": "最近あった出来事は？"
     }'
 {"question":"最近あった出来事は？","answer":"最近の出来事といえば、曲の最後の詰めをしようとしていたときに、Wavesのプラグインの認証が急に通らなくなってしまったことがありました。ちょっと焦りましたが、PowerShell周りをいじったらなんとか直りました。ただ、Wavesのプラグインの認証周りは本当に勝手が悪くて、もう少しスムーズにいってほしいなと思っています。","search_results":[{"id":"WMFm5ZcBlg4zycrBZ0lN","score":0.78672117,"content":"曲最後の詰めやろうとしたら急にWavesの認証が通らなくなった・・・PowerShell周り弄ったら直ったけど、プラグイン認証周り勝手が悪いんだよなーWavesは","tag":"music","timestamp":"2025-07-05T18:00:00.000000"}],"search_count":1,"used_knowledge":true,"processing_time":6.18,"model_type":"openai","model_size":"4b"}
