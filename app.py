@@ -367,6 +367,26 @@ async def reset_index(key: str = Depends(verify_api_key)):
         )
 
 
+@api_router.delete("/documents/{document_id}")
+async def delete_document(document_id: str, key: str = Depends(verify_api_key)):
+    """特定のドキュメントIDのドキュメントを削除"""
+    try:
+        result = vector_store.delete_document(INDEX_NAME, document_id)
+
+        if "error" in result:
+            if "見つかりません" in result["error"]:
+                raise HTTPException(status_code=404, detail=result["error"])
+            else:
+                raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ドキュメント削除エラー: {str(e)}")
+
+
 @api_router.post("/conversation", response_model=ConversationResponse)
 async def conversation_with_rag(
     request: ConversationRequest, content_type: str = Depends(require_json_content_type)
