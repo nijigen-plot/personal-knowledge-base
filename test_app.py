@@ -6,6 +6,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import app
+from log_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # fixtureはテストにされる関数で、API連携やDB接続を事事前テストするためのもの。
@@ -127,8 +130,8 @@ class TestSearchEndpoint:
         response = client.post("/api/v1/search", json={"query": "テスト", "k": 5})
 
         if response.status_code != 200:
-            print(f"Response status: {response.status_code}")
-            print(f"Response body: {response.text}")
+            logger.error(f"Response status: {response.status_code}")
+            logger.error(f"Response body: {response.text}")
 
         assert response.status_code == 200
         data = response.json()
@@ -297,8 +300,8 @@ class TestConversationEndpoint:
         response = client.post("/api/v1/conversation", json=conversation_data)
 
         if response.status_code != 200:
-            print(f"Response status: {response.status_code}")
-            print(f"Response body: {response.text}")
+            logger.error(f"Response status: {response.status_code}")
+            logger.error(f"Response body: {response.text}")
 
         assert response.status_code == 200
         data = response.json()
@@ -359,8 +362,8 @@ class TestConversationEndpoint:
         response = client.post("/api/v1/conversation", json=conversation_data)
 
         if response.status_code != 200:
-            print(f"Response status: {response.status_code}")
-            print(f"Response body: {response.text}")
+            logger.error(f"Response status: {response.status_code}")
+            logger.error(f"Response body: {response.text}")
 
         assert response.status_code == 200
 

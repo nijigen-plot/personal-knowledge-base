@@ -27,3 +27,6 @@ history.txt
 
 # Knowledge Base Local Contents
 old_docs/*
+
+# log file
+*.log
