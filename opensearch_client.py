@@ -7,7 +7,11 @@ import numpy as np
 from dotenv import load_dotenv
 from opensearchpy import OpenSearch, helpers
 
+from log_config import get_logger
+
 load_dotenv(".env")
+
+logger = get_logger(__name__)
 
 
 class OpenSearchVectorStore:
@@ -30,13 +34,13 @@ class OpenSearchVectorStore:
             ssl_show_warn=False,
         )
 
-        print(f"OpenSearchクライアント初期化完了: {host}:{port}")
+        logger.info(f"OpenSearchクライアント初期化完了: {host}:{port}")
 
         try:
             info = self.client.info()
-            print(f"OpenSearch接続確認: {info['version']['number']}")
+            logger.info(f"OpenSearch接続確認: {info['version']['number']}")
         except Exception as e:
-            print(f"OpenSearch接続エラー: {e}")
+            logger.error(f"OpenSearch接続エラー: {e}")
             raise
 
     def create_index(
@@ -44,10 +48,10 @@ class OpenSearchVectorStore:
     ):
         if self.client.indices.exists(index=index_name):
             if force_recreate:
-                print(f"インデックス削除中: {index_name}")
+                logger.info(f"インデックス削除中: {index_name}")
                 self.client.indices.delete(index_name)
             else:
-                print(f"インデックスは既に存在します: {index_name}")
+                logger.info(f"インデックスは既に存在します: {index_name}")
                 return
 
         index_mapping = {
@@ -74,7 +78,7 @@ class OpenSearchVectorStore:
         }
 
         self.client.indices.create(index_name, body=index_mapping)
-        print(f"インデックス作成完了: {index_name}")
+        logger.info(f"インデックス作成完了: {index_name}")
 
     def add_documents(
         self, index_name: str, documents: List[Dict[str, Any]], embeddings: np.ndarray
@@ -102,12 +106,12 @@ class OpenSearchVectorStore:
         )
 
         end_time = time.perf_counter()
-        print(
+        logger.info(
             f"ドキュメント追加完了: {success_count}件成功、{end_time - start_time:.2f}秒"
         )
 
         if failed_items:
-            print(f"失敗したアイテム: {len(failed_items)}件")
+            logger.error(f"失敗したアイテム: {len(failed_items)}件")
 
         return success_count, failed_items
 
@@ -162,7 +166,7 @@ class OpenSearchVectorStore:
             }
             results.append(result)
 
-        print(f"検索完了: {len(results)}件ヒット、{end_time - start_time:.2f}秒")
+        logger.info(f"検索完了: {len(results)}件ヒット、{end_time - start_time:.2f}秒")
         return results
 
     def delete_document(self, index_name: str, document_id: str) -> Dict[str, Any]:
@@ -172,7 +176,7 @@ class OpenSearchVectorStore:
                 return {"error": f"インデックスが存在しません: {index_name}"}
 
             response = self.client.delete(index=index_name, id=document_id)
-            print(f"ドキュメント削除完了: {document_id}")
+            logger.info(f"ドキュメント削除完了: {document_id}")
             return {
                 "message": f"ドキュメント {document_id} を削除しました",
                 "result": response["result"],
@@ -186,9 +190,9 @@ class OpenSearchVectorStore:
     def delete_index(self, index_name: str):
         if self.client.indices.exists(index_name):
             self.client.indices.delete(index_name)
-            print(f"インデックス削除完了: {index_name}")
+            logger.info(f"インデックス削除完了: {index_name}")
         else:
-            print(f"インデックスが存在しません: {index_name}")
+            logger.info(f"インデックスが存在しません: {index_name}")
 
     def get_index_stats(self, index_name: str) -> Dict[str, Any]:
         if not self.client.indices.exists(index_name):
@@ -244,23 +248,23 @@ if __name__ == "__main__":
     time.sleep(3)
 
     stats = vector_store.get_index_stats(index_name)
-    print(f"インデックス統計: {stats}")
+    logger.info(f"インデックス統計: {stats}")
 
     # 完全に同じベクトルで検索
-    print("\n=== 完全に同じベクトルで検索 ===")
+    logger.info("\n=== 完全に同じベクトルで検索 ===")
     results = vector_store.search(index_name, test_vector, k=3)
-    print(f"検索結果: {len(results)}件")
+    logger.info(f"検索結果: {len(results)}件")
     for i, result in enumerate(results):
-        print(
+        logger.info(
             f"  {i+1}. スコア: {result['score']:.6f}, タグ: {result['tag']}, 内容: {result['content'][:30]}..."
         )
 
     # 少し違うベクトルで検索
-    print("\n=== 少し違うベクトルで検索 ===")
+    logger.info("\n=== 少し違うベクトルで検索 ===")
     similar_vector = test_vector * 1.1
     results2 = vector_store.search(index_name, similar_vector, k=3)
-    print(f"検索結果: {len(results2)}件")
+    logger.info(f"検索結果: {len(results2)}件")
     for i, result in enumerate(results2):
-        print(
+        logger.info(
             f"  {i+1}. スコア: {result['score']:.6f}, タグ: {result['tag']}, 内容: {result['content'][:30]}..."
         )

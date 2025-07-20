@@ -7,16 +7,20 @@ import numpy as np
 import torch
 from transformers import AutoModel, AutoTokenizer
 
+from log_config import get_logger
+
 # メモリ解放を積極的に行う設定
 os.environ["MALLOC_TRIM_THRESHOLD_"] = "-1"
+
+logger = get_logger(__name__)
 
 
 class PlamoEmbedding:
     def __init__(self, model_path: str = "./plamo-embedding-1b"):
-        print(f"PlamoEmbeddingモデルを初期化中: {model_path}")
+        logger.info(f"PlamoEmbeddingモデルを初期化中: {model_path}")
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"デバイス: {self.device}")
+        logger.info(f"デバイス: {self.device}")
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_path, trust_remote_code=True
@@ -32,7 +36,7 @@ class PlamoEmbedding:
             self.model = self.model.to(self.device)
 
         self.model.eval()  # モデルを評価モードに設定
-        print("PlamoEmbeddingモデルの初期化完了")
+        logger.info("PlamoEmbeddingモデルの初期化完了")
 
     def encode(
         self, texts: Union[str, List[str]], normalize: bool = True
@@ -45,7 +49,7 @@ class PlamoEmbedding:
             sentences=texts, tokenizer=self.tokenizer
         )
         end_time = time.perf_counter()
-        print(
+        logger.info(
             f"Embedding生成完了: {len(texts)}件のテキスト、{end_time - start_time:.2f}秒"
         )
 
@@ -56,7 +60,7 @@ class PlamoEmbedding:
 
     def clear_memory(self):
         """メモリを明示的に解放"""
-        print("PlamoEmbeddingモデルのメモリを解放中...")
+        logger.info("PlamoEmbeddingモデルのメモリを解放中...")
 
         if hasattr(self, "model") and self.model is not None:
             del self.model
@@ -65,7 +69,7 @@ class PlamoEmbedding:
 
         # Python ガベージコレクション
         gc.collect()
-        print("PlamoEmbeddingモデルのメモリ解放完了")
+        logger.info("PlamoEmbeddingモデルのメモリ解放完了")
 
     def __del__(self):
         """デストラクタでメモリ解放"""
@@ -85,5 +89,5 @@ if __name__ == "__main__":
     ]
 
     embeddings = embedding_model.encode(test_texts)
-    print(f"生成されたembeddingの形状: {embeddings.shape}")
-    print(f"Embedding次元数: {embedding_model.get_embedding_dimension()}")
+    logger.info(f"生成されたembeddingの形状: {embeddings.shape}")
+    logger.info(f"Embedding次元数: {embedding_model.get_embedding_dimension()}")

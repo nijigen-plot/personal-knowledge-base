@@ -11,9 +11,12 @@ from pydantic import BaseModel
 
 from embedding_model import PlamoEmbedding
 from llm import LargeLanguageModel
+from log_config import get_logger
 from opensearch_client import OpenSearchVectorStore
 
 load_dotenv(".env")
+
+logger = get_logger(__name__)
 
 
 class DocumentRequest(BaseModel):
@@ -73,7 +76,7 @@ INDEX_NAME = "knowledge-base"
 async def lifespan(app: FastAPI):
     global embedding_model, vector_store, llm_model
 
-    print("ナレッジベースAPIを初期化中...")
+    logger.info("ナレッジベースAPIを初期化中...")
 
     # Embeddingモデル初期化
     embedding_model = PlamoEmbedding("./plamo-embedding-1b")
@@ -96,10 +99,10 @@ async def lifespan(app: FastAPI):
 
     llm_model = LargeLanguageModel()
 
-    print("ナレッジベースAPI初期化完了")
+    logger.info("ナレッジベースAPI初期化完了")
     yield
 
-    print("ナレッジベースAPIをシャットダウン中...")
+    logger.info("ナレッジベースAPIをシャットダウン中...")
 
 
 app = FastAPI(

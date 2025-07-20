@@ -14,8 +14,12 @@ from llama_cpp import Llama
 from openai import OpenAI
 from transformers import pipeline
 
+from log_config import get_logger
+
 # 環境変数読み込み
 load_dotenv()
+
+logger = get_logger(__name__)
 
 # メモリ解放を積極的に行う設定
 os.environ["MALLOC_TRIM_THRESHOLD_"] = "-1"
@@ -291,15 +295,15 @@ class LargeLanguageModel:
                     if chunk.choices[0].delta.content is not None:
                         content = chunk.choices[0].delta.content
                         if not silent:
-                            print(content, end="", flush=True)
+                            logger.info(content, end="", flush=True)
                         partial_message += content
                 if not silent:
-                    print()
+                    logger.info()
                 return partial_message.strip()
             else:
                 content = response.choices[0].message.content
                 if not silent:
-                    print(content)
+                    logger.info(content)
                 return content.strip()
         except Exception as e:
             logger.error(f"OpenAI API呼び出しエラー: {e}")
@@ -328,10 +332,10 @@ class LargeLanguageModel:
                 if "content" in message:
                     content = message["content"]
                     if not silent:
-                        print(content, end="", flush=True)
+                        logger.info(content, end="", flush=True)
                     partial_message += content
             if not silent:
-                print()
+                logger.info()
             return partial_message.strip()
         else:
             content = resp["choices"][0]["message"]["content"]
@@ -345,19 +349,19 @@ class LargeLanguageModel:
         response_text = output[0]["generated_text"][-1]["content"].strip()
         # PyTorchモデルはストリーミング非対応なので常に出力（silentでない場合）
         if not silent:
-            print(response_text)
+            logger.info(response_text)
         return response_text
 
     def clear_memory(self):
         """メモリを明示的に解放"""
-        print("言語モデルのメモリを解放中...")
+        logger.info("言語モデルのメモリを解放中...")
 
         if hasattr(self, "model") and self.model is not None:
             del self.model
 
         # Python ガベージコレクション
         gc.collect()
-        print("言語モデルのメモリ解放完了")
+        logger.info("言語モデルのメモリ解放完了")
 
     def _extract_timestamp_with_regex(self, text: str) -> Optional[Dict[str, str]]:
         """正規表現を使用してタイムスタンプを抽出"""
@@ -462,7 +466,7 @@ class LargeLanguageModel:
                     temperature=0.1,
                     silent=False,
                 )
-                print(f"抽出結果 (試行 {attempt + 1}/{max_retries}): {response}")
+                logger.info(f"抽出結果 (試行 {attempt + 1}/{max_retries}): {response}")
 
                 # JSONブロックを抽出
                 json_str = self._extract_json_from_response(response)
@@ -482,7 +486,7 @@ class LargeLanguageModel:
 
                     # バリデーション
                     if self._validate_extraction_result(final_result):
-                        print(final_result)
+                        logger.info(final_result)
                         return final_result
 
             except (json.JSONDecodeError, KeyError, TypeError) as e:
