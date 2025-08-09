@@ -37,60 +37,29 @@ HISTORY_FILE = "history.txt"
 
 
 class LargeLanguageModel:
-    def __init__(self, model_type: str = "openai", model_size: str = "4b"):
+    def __init__(self, model_type: str = "openai-api"):
         """
         大規模言語モデルの統合クラス
 
         Args:
-            model_type: "openai", "gguf", または "pytorch"
-            model_size: "1b" または "4b" または "12b" (ggufモデルのみ)
+            model_type: "openai-api" または "opanai-20b"
         """
         self.model_type = model_type
-        self.model_size = model_size
         self.model = None
 
-        if model_type == "openai":
-            self._load_openai_client()
-        elif model_type == "gguf":
-            self._load_gguf_model()
-        elif model_type == "pytorch":
-            self._load_pytorch_model()
+        if model_type == "openai-api":
+            self._load_openai_api_client()
+        elif model_type == "openai-20b":
+            self._load_openai_20b_client()
         else:
             raise ValueError(
-                "model_typeは'openai', 'gguf', または'pytorch'を指定してください"
+                "model_typeは'openaiapi' または'openai-20b'を指定してください"
             )
 
-    def _load_gguf_model(self):
-        """GGUF量子化モデルを読み込み"""
-        if self.model_size == "1b":
-            model_path = "./gemma-3-1b-it-qat-q4_0-gguf/gemma-3-1b-it-q4_0.gguf"
-        elif self.model_size == "4b":
-            model_path = "./gemma-3-4b-it-qat-q4_0-gguf/gemma-3-4b-it-q4_0.gguf"
-        elif self.model_size == "12b":
-            model_path = "./gemma-3-12b-it-qat-q4_0-gguf/gemma-3-12b-it-q4_0.gguf"
-        else:
-            raise ValueError(
-                "model_sizeは'1b', '4b', '12b'のいずれかを指定してください"
-            )
-        logger.info(f"GGUFモデルを読み込み中: {model_path}")
-
-        self.model = Llama(
-            model_path=model_path,
-            verbose=False,
-            n_ctx=32768,
-        )
-        logger.info(f"GGUFモデルの読み込み完了: {self.model_size} モデル")
-
-    def _load_pytorch_model(self):
+    def _load_openai_20b_client(self):
         """PyTorchモデルを読み込み"""
         device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        if self.model_size == "1b":
-            model_path = "./gemma-3-1b-it"
-        elif self.model_size == "4b":
-            model_path = "./gemma-3-4b-it"
-        else:
-            raise ValueError("model_sizeは'1b'または'4b'を指定してください")
+        model_path = "./gpt-oss-20b"
 
         logger.info(f"PyTorchモデルを読み込み中: {model_path} (device: {device})")
 
@@ -100,9 +69,9 @@ class LargeLanguageModel:
             device=device,
             torch_dtype="auto",
         )
-        logger.info(f"PyTorchモデルの読み込み完了: {self.model_size} モデル")
+        logger.info(f"PyTorchモデルの読み込み完了: ")
 
-    def _load_openai_client(self):
+    def _load_openai_api_client(self):
         """OpenAI APIクライアントを初期化"""
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -232,18 +201,22 @@ class LargeLanguageModel:
             {"role": "user", "content": [{"type": "text", "text": prompt}]},
         ]
 
-        response_text = ""
+        # モデル生成関数のマッピング
+        generators = {
+            "openai-api": lambda: self._generate_openai(
+                messages, stream, max_tokens, temperature, silent
+            ),
+            "openai-20b": lambda: self._generate_pytorch(messages, max_tokens, silent),
+        }
 
-        if self.model_type == "openai":
-            response_text = self._generate_openai(
-                messages, stream, max_tokens, temperature, silent
+        generator = generators.get(self.model_type)
+        if not generator:
+            raise ValueError(
+                f"未対応のmodel_type: {self.model_type}. "
+                f"対応可能: {list(generators.keys())}"
             )
-        elif self.model_type == "gguf":
-            response_text = self._generate_gguf(
-                messages, stream, max_tokens, temperature, silent
-            )
-        else:
-            response_text = self._generate_pytorch(messages, max_tokens, silent)
+
+        response_text = generator()
 
         end = time.perf_counter() - start
         if not silent:
@@ -308,38 +281,6 @@ class LargeLanguageModel:
         except Exception as e:
             logger.error(f"OpenAI API呼び出しエラー: {e}")
             return f"エラーが発生しました: {e}"
-
-    def _generate_gguf(
-        self,
-        messages: List[Dict[str, Any]],
-        stream: bool,
-        max_tokens: int,
-        temperature: float,
-        silent: bool = False,
-    ) -> str:
-        """GGUF モデルでテキスト生成"""
-        resp = self.model.create_chat_completion(
-            messages=messages,
-            max_tokens=max_tokens,
-            stream=stream,
-            temperature=temperature,
-        )
-
-        if stream:
-            partial_message = ""
-            for msg in resp:
-                message = msg["choices"][0]["delta"]
-                if "content" in message:
-                    content = message["content"]
-                    if not silent:
-                        logger.info(content, end="", flush=True)
-                    partial_message += content
-            if not silent:
-                logger.info()
-            return partial_message.strip()
-        else:
-            content = resp["choices"][0]["message"]["content"]
-            return content.strip()
 
     def _generate_pytorch(
         self, messages: List[Dict[str, Any]], max_tokens: int, silent: bool = False
@@ -570,19 +511,17 @@ class LargeLanguageModel:
 def main():
     parser = argparse.ArgumentParser(description="大規模言語モデル統合AIアシスタント")
     parser.add_argument(
-        "prompt", nargs="?", type=str, help="AIに問い合わせるプロンプト"
+        "prompt",
+        nargs="?",
+        type=str,
+        help="AIに問い合わせるプロンプト",
+        default="こんにちは～あなたが駆動しているモデルを教えてください",
     )
     parser.add_argument(
         "--model-type",
-        choices=["openai", "gguf", "pytorch"],
-        default="openai",
-        help="使用するモデルタイプ (デフォルト: openai)",
-    )
-    parser.add_argument(
-        "--model-size",
-        choices=["1b", "4b"],
-        default="4b",
-        help="LLMモデルのサイズ (デフォルト: 4b)",
+        choices=["openai-api", "openai-20b"],
+        default="openai-api",
+        help="使用するモデルタイプ (デフォルト: openai-api)",
     )
     parser.add_argument(
         "--no-stream", action="store_true", help="ストリーミング出力を無効化"
@@ -600,14 +539,8 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.prompt:
-        if args.model_type == "openai":
-            args.prompt = "こんにちは～あなたが駆動しているモデルを教えてください（OpenAI GPT-4o）"
-        else:
-            args.prompt = "こんにちは～あなたが駆動しているモデルを教えてください"
-
     # モデル初期化
-    model = LargeLanguageModel(model_type=args.model_type, model_size=args.model_size)
+    model = LargeLanguageModel(model_type=args.model_type)
 
     if args.extract_tag:
         model.extract_tag(
