@@ -22,7 +22,7 @@ def setup_logger() -> logging.Logger:
 
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)
-    stream_handler.setLevel(logging.ERROR)
+    stream_handler.setLevel(logging.INFO)
     logger.addHandler(stream_handler)
 
     return logger
