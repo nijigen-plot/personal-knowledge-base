@@ -1,7 +1,6 @@
 import argparse
 import gc
 import json
-import logging
 import os
 import re
 import time
@@ -23,15 +22,6 @@ logger = get_logger(__name__)
 
 # メモリ解放を積極的に行う設定
 os.environ["MALLOC_TRIM_THRESHOLD_"] = "-1"
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-stream_handler.setFormatter(formatter)
-logger.addHandler(stream_handler)
 
 HISTORY_FILE = "history.txt"
 
