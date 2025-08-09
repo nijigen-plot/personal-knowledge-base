@@ -295,15 +295,15 @@ class LargeLanguageModel:
                     if chunk.choices[0].delta.content is not None:
                         content = chunk.choices[0].delta.content
                         if not silent:
-                            logger.info(content, end="", flush=True)
+                            print(content, end="", flush=True)
                         partial_message += content
                 if not silent:
-                    logger.info()
+                    print(content)
                 return partial_message.strip()
             else:
                 content = response.choices[0].message.content
                 if not silent:
-                    logger.info(content)
+                    print(content)
                 return content.strip()
         except Exception as e:
             logger.error(f"OpenAI API呼び出しエラー: {e}")
@@ -349,7 +349,7 @@ class LargeLanguageModel:
         response_text = output[0]["generated_text"][-1]["content"].strip()
         # PyTorchモデルはストリーミング非対応なので常に出力（silentでない場合）
         if not silent:
-            logger.info(response_text)
+            print(response_text)
         return response_text
 
     def clear_memory(self):
