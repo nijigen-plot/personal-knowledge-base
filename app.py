@@ -63,7 +63,6 @@ class ConversationResponse(BaseModel):
     used_knowledge: bool
     processing_time: float
     model_type: str
-    model_size: str
 
 
 embedding_model = None
@@ -463,7 +462,6 @@ async def conversation_with_rag(
             used_knowledge=used_knowledge,
             processing_time=round(total_end_time, 2),
             model_type=llm_model.model_type,
-            model_size=llm_model.model_size,
         )
 
     except Exception as e:

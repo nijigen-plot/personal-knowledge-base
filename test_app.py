@@ -55,7 +55,6 @@ def mock_llm_model():
     """LLMモデルのモック"""
     mock_llm = Mock()
     mock_llm.model_type = "gguf"
-    mock_llm.model_size = "1b"
     mock_llm.generate.return_value = "これはLLMからのテスト応答です。"
     mock_llm.extract_tag.return_value = {
         "tag": "music",
@@ -310,7 +309,6 @@ class TestConversationEndpoint:
         assert data["question"] == "ナレッジベースについて教えて"
         assert data["answer"] == "これはLLMからのテスト応答です。"
         assert data["model_type"] == "gguf"
-        assert data["model_size"] == "1b"
         assert "processing_time" in data
         assert "search_results" in data
         assert data["search_count"] == 1  # mock_vector_storeから1件返される
@@ -479,7 +477,6 @@ def mock_global_objects():
         }
 
         mock_llm.model_type = "gguf"
-        mock_llm.model_size = "1b"
         mock_llm.generate.return_value = "デフォルトのLLM応答"
         mock_llm.extract_tag.return_value = {
             "tag": None,
