@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from dotenv import load_dotenv
-from llama_cpp import Llama
 from openai import OpenAI
 from transformers import pipeline
 
