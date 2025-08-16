@@ -99,6 +99,9 @@ services:
       dockerfile: Dockerfile
     profiles: ["streamlit", "dev"]
     container_name: streamlit
+    environment:
+      - APP_HOST=${APP_HOST} # Host for Streamlit app
+      - APP_PORT=${APP_PORT} # Port for Streamlit app
     ports:
       - "${STREAMLIT_APP_PORT}:${STREAMLIT_APP_PORT}"
     command: "uv run streamlit run streamlit_app.py --server.port ${STREAMLIT_APP_PORT}"
