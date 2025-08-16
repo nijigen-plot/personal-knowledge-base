@@ -185,10 +185,18 @@ class LargeLanguageModel:
                     }
                 )
 
-        messages = [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": [{"type": "text", "text": prompt}]},
-        ]
+        # OpenAI API用とPyTorch用でmessage形式を分ける
+        if self.model_type == "openai-api":
+            messages = [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": [{"type": "text", "text": prompt}]},
+            ]
+        else:
+            # PyTorch用はstring形式
+            messages = [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": prompt},
+            ]
 
         # モデル生成関数のマッピング
         generators = {
@@ -275,7 +283,8 @@ class LargeLanguageModel:
         self, messages: List[Dict[str, Any]], max_tokens: int, silent: bool = False
     ) -> str:
         """PyTorch モデルでテキスト生成"""
-        output = self.model(text_inputs=messages, max_new_tokens=max_tokens)
+        # messagesをchat templateで処理
+        output = self.model(messages, max_new_tokens=max_tokens)
         response_text = output[0]["generated_text"][-1]["content"].strip()
         # PyTorchモデルはストリーミング非対応なので常に出力（silentでない場合）
         if not silent:
