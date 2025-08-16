@@ -76,6 +76,7 @@ services:
     environment:
       - APP_HOST=${APP_HOST} # Host for FastAPI server
       - APP_PORT=${APP_PORT} # Port for FastAPI server
+      - ADMIN_API_KEY=${ADMIN_API_KEY} # API key for admin access
       - OPENSEARCH_HOST=${OPENSEARCH_HOST}
       - OPENSEARCH_PORT=${OPENSEARCH_PORT}
       - OPENSEARCH_USER=${OPENSEARCH_USER}
