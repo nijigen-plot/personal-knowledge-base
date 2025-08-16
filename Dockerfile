@@ -4,8 +4,9 @@ ARG TARGETARCH
 
 SHELL ["/bin/bash", "-c"]
 
+# DEBIAN_FRONTEND=noninteractive は 設定しないとtzdataの設定が対話的になりそこから進まなくなる
 RUN apt-get update \
-    && apt-get -y install \
+    && env DEBIAN_FRONTEND=noninteractive apt-get -y install \
     python3.11 python3-pip tzdata curl wget zip unzip git make jq vim direnv \
     && apt-get clean all \
     && rm -rf /var/lib/apt/lists/*
