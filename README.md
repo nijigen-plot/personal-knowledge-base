@@ -5,6 +5,8 @@
 
 ![アーキテクチャ図](./architecture.png)
 
+[全体像について記載した記事](https://zenn.dev/nijigen_plot/articles/personal_knowledge_base)
+
 # 使い方
 
 ## StreamlitチャットBOT
@@ -39,8 +41,7 @@ https://home.quark-hardcore.com/personal-knowledge-base/app/
 7. `source ~/.bashrc` (.bashrcに`eval "$(direnv hook bash)"`があること前提)
 8. `direnv allow`
 
-## command flow
-
+## 共通設定
 結局LLMはOpenAIが安定という結論になったので、デフォルトOPENAI APIを使っています。
 .envに`OPENAPI_API_KEY=`があるのでそれにKEYいれてください。
 
@@ -54,10 +55,26 @@ https://home.quark-hardcore.com/personal-knowledge-base/app/
 8. (必須ではない)clone llm repository `git clone git@hf.co:google/gemma-3-1b-it-qat-q4_0-gguf`(Need Write Permission Access Token)
 9. git embedding model repository `git clone git@hf.co:pfnet/plamo-embedding-1b`
 10. run `docker compose up -d` (OpenSearch Server 専用のサーバー 192.168.0.45があるのでそっちで立ち上げ済)
-11. run `uv run pytest test_app.py` （単体テスト）
-12. run `uv run uvicorn app:app --reload --port $APP_PORT --host $APP_HOST` or `uv run python app.py`(FastAPI立ち上げ)
-13. run `uv run streamlit run streamlit_app.py --server.port $STREAMLIT_APP_PORT` (192.168.0.44 チャットBOT用Streamlit立ち上げ)
+11. run `docker compose ps -a` で立ち上がっているかチェック
+12. run `curl https://localhost:9200 -ku username:password` で情報が返ってくるかチェック
+13. run `uv run pytest test_app.py` （単体テスト）
+14. run `uv run uvicorn app:app --reload --port $APP_PORT --host $APP_HOST` or `uv run python app.py`(FastAPI立ち上げ)
+15. run `uv run streamlit run streamlit_app.py --server.port $STREAMLIT_APP_PORT` (192.168.0.44 チャットBOT用Streamlit立ち上げ)
 
+## API Server
+
+## LLM Server
+
+1. run `docker build -f llm.Dockerfile . -t llm-server`
+2. run `docker run --gpus all -v ./gpt-oss-20b:/app/gpt-oss-20b llm-server`
+
+## OpenSearch Server
+
+セキュリティやらmax_map_countやらで落とし穴多い
+
+- https://docs.opensearch.org/2.19/install-and-configure/install-opensearch/index/#important-settings
+
+## Front Server
 
 ### daemon
 - 192.168.0.46 : `/etc/systemd/system/personal-knowledge-base-fastapi.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
