@@ -1,12 +1,23 @@
+import os
 import time
 from typing import Generator
 
 import requests
 import streamlit as st
+from dotenv import load_dotenv
+
+from log_config import get_logger
+
+load_dotenv(".env")
+
+logger = get_logger(__name__)
 
 
 def post_conversation(prompt: str) -> Generator[str, None, None]:
-    url = "https://home.quark-hardcore.com/personal-knowledge-base/api/v1/conversation"
+    # 環境変数からFastAPIのホストとポートを取得
+    app_host = os.getenv("APP_HOST", "localhost")
+    app_port = os.getenv("APP_PORT", "8050")
+    url = f"http://{app_host}:{app_port}/api/v1/conversation"
     try:
         response = requests.post(
             url,
@@ -18,7 +29,8 @@ def post_conversation(prompt: str) -> Generator[str, None, None]:
             "answer",
             "申し訳ありませんが、内部エラーにより回答できませんでした。管理者にお問い合わせください。",
         )
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
+        logger.error(f"APIリクエストエラー: {e}")
         response_str = "申し訳ありませんが、サーバーとの通信でエラーが発生しました。管理者にお問い合わせください。"
 
     for char in response_str:

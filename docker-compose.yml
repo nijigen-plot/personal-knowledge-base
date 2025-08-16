@@ -1,6 +1,7 @@
 services:
   opensearch-node1: # This is also the hostname of the container within the Docker network (i.e. https://opensearch-node1/)
     image: opensearchproject/opensearch:2.19.1
+    profiles: ["opensearch", "dev"]
     container_name: opensearch-node1
     environment:
       - cluster.name=opensearch-cluster # Name the cluster
@@ -21,12 +22,19 @@ services:
       - opensearch-data1:/usr/share/opensearch/data # Creates volume called opensearch-data1 and mounts it to the container
     restart: always
     ports:
-      - 9200:9200 # REST API
+      - ${OPENSEARCH_PORT}:${OPENSEARCH_PORT} # REST API
       - 9600:9600 # Performance Analyzer
     networks:
-      - opensearch-net # All of the containers will join the same Docker bridge network
+      - knowledge-base-net # All of the containers will join the same Docker bridge network
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-u", "${OPENSEARCH_USER}:${OPENSEARCH_INITIAL_ADMIN_PASSWORD}", "https://localhost:${OPENSEARCH_PORT}"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
   opensearch-node2:
     image: opensearchproject/opensearch:2.19.1 # This should be the same image used for opensearch-node1 to avoid issues
+    profiles: ["opensearch", "dev"]
     container_name: opensearch-node2
     environment:
       - cluster.name=opensearch-cluster
@@ -47,18 +55,64 @@ services:
       - opensearch-data2:/usr/share/opensearch/data
     restart: always
     networks:
-      - opensearch-net
+      - knowledge-base-net
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2.19.1 # Make sure the version of opensearch-dashboards matches the version of opensearch installed on other nodes
+    profiles: ["opensearch", "dev"]
     container_name: opensearch-dashboards
     ports:
-      - 5601:5601 # Map host port 5601 to container port 5601
-    expose:
-      - "5601" # Expose port 5601 for web access to OpenSearch Dashboards
+      - ${OPENSEARCH_DASHBOARD_PORT}:${OPENSEARCH_DASHBOARD_PORT} # Map host port 5601 to container port 5601
     environment:
-      OPENSEARCH_HOSTS: '["https://opensearch-node1:9200","https://opensearch-node2:9200"]' # Define the OpenSearch nodes that OpenSearch Dashboards will query
+      OPENSEARCH_HOSTS: '["https://opensearch-node1:${OPENSEARCH_PORT}","https://opensearch-node2:${OPENSEARCH_PORT}"]' # Define the OpenSearch nodes that OpenSearch Dashboards will query
     networks:
-      - opensearch-net
+      - knowledge-base-net
+    restart: always
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["fastapi", "dev"]
+    container_name: fastapi
+    environment:
+      - APP_HOST=${APP_HOST} # Host for FastAPI server
+      - APP_PORT=${APP_PORT} # Port for FastAPI server
+      - ADMIN_API_KEY=${ADMIN_API_KEY} # API key for admin access
+      - OPENSEARCH_HOST=${OPENSEARCH_HOST}
+      - OPENSEARCH_PORT=${OPENSEARCH_PORT}
+      - OPENSEARCH_USER=${OPENSEARCH_USER}
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    command: "uv run uvicorn app:app --reload --port ${APP_PORT} --host ${APP_HOST}"
+    volumes:
+      - ./:/app
+      - /app/.venv
+    depends_on:
+      opensearch-node1:
+        condition: service_healthy # Wait for OpenSearch to be healthy before starting FastAPI
+    networks:
+      - knowledge-base-net
+    restart: always
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["streamlit", "dev"]
+    container_name: streamlit
+    environment:
+      - APP_HOST=${APP_HOST} # Host for Streamlit app
+      - APP_PORT=${APP_PORT} # Port for Streamlit app
+    ports:
+      - "${STREAMLIT_APP_PORT}:${STREAMLIT_APP_PORT}"
+    command: "uv run streamlit run streamlit_app.py --server.port ${STREAMLIT_APP_PORT}"
+    volumes:
+      - ./:/app
+      - /app/.venv
+    depends_on:
+      - fastapi
+    networks:
+      - knowledge-base-net
     restart: always
 
 volumes:
@@ -66,4 +120,4 @@ volumes:
   opensearch-data2:
 
 networks:
-  opensearch-net:
+  knowledge-base-net:
