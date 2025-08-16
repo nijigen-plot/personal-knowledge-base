@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 class DocumentRequest(BaseModel):
     content: str
-    timestamp: str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
+    timestamp: Optional[str] = None
     tag: Literal["lifestyle", "music", "technology"]
 
 
@@ -221,10 +221,15 @@ def add_document(
     try:
         start_time = time.perf_counter()
 
+        # timestampがNoneの場合は現在時刻を設定
+        timestamp = request.timestamp
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
+
         embedding = embedding_model.encode(request.content)
         document = {
             "tag": request.tag,
-            "timestamp": request.timestamp,
+            "timestamp": timestamp,
             "content": request.content,
         }
 
@@ -269,10 +274,18 @@ def add_documents_batch(
             contents = [req.content for req in batch_requests]
             embeddings = embedding_model.encode(contents)
 
-            documents = [
-                {"tag": req.tag, "timestamp": req.timestamp, "content": req.content}
-                for req in batch_requests
-            ]
+            documents = []
+            for req in batch_requests:
+                # timestampがNoneの場合は現在時刻を設定
+                timestamp = req.timestamp
+                if timestamp is None:
+                    timestamp = datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%S.%f"
+                    )
+
+                documents.append(
+                    {"tag": req.tag, "timestamp": timestamp, "content": req.content}
+                )
 
             success_count, failed_items = vector_store.add_documents(
                 INDEX_NAME, documents, embeddings
