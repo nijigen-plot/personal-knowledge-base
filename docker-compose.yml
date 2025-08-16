@@ -71,7 +71,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    profiles: ["fastapi", "dev"]
+    profiles: ["dev"]
     container_name: fastapi
     environment:
       - APP_HOST=${APP_HOST} # Host for FastAPI server
@@ -94,11 +94,33 @@ services:
     networks:
       - knowledge-base-net
     restart: always
+  fastapi-standalone:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["fastapi"]
+    container_name: fastapi-standalone
+    environment:
+      - APP_HOST=${APP_HOST} # Host for FastAPI server
+      - APP_PORT=${APP_PORT} # Port for FastAPI server
+      - ADMIN_API_KEY=${ADMIN_API_KEY} # API key for admin access
+      - OPENSEARCH_HOST=${OPENSEARCH_HOST}
+      - OPENSEARCH_PORT=${OPENSEARCH_PORT}
+      - OPENSEARCH_USER=${OPENSEARCH_USER}
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    command: "uv run uvicorn app:app --reload --port ${APP_PORT} --host ${APP_HOST}"
+    volumes:
+      - ./:/app
+      - /app/.venv
+    restart: always
   streamlit:
     build:
       context: .
       dockerfile: Dockerfile
-    profiles: ["streamlit", "dev"]
+    profiles: ["dev"]
     container_name: streamlit
     environment:
       - APP_HOST=${APP_HOST} # Host for Streamlit app
@@ -113,6 +135,22 @@ services:
       - fastapi
     networks:
       - knowledge-base-net
+    restart: always
+  streamlit-standalone:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["streamlit"]
+    container_name: streamlit-standalone
+    environment:
+      - APP_HOST=${APP_HOST} # Host for Streamlit app
+      - APP_PORT=${APP_PORT} # Port for Streamlit app
+    ports:
+      - "${STREAMLIT_APP_PORT}:${STREAMLIT_APP_PORT}"
+    command: "uv run streamlit run streamlit_app.py --server.port ${STREAMLIT_APP_PORT}"
+    volumes:
+      - ./:/app
+      - /app/.venv
     restart: always
 
 volumes:
