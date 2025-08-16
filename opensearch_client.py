@@ -77,7 +77,7 @@ class OpenSearchVectorStore:
             },
         }
 
-        self.client.indices.create(index_name, body=index_mapping)
+        self.client.indices.create(index=index_name, body=index_mapping)
         logger.info(f"インデックス作成完了: {index_name}")
 
     def add_documents(
