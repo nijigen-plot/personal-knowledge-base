@@ -74,6 +74,18 @@ https://home.quark-hardcore.com/personal-knowledge-base/app/
 
 - https://docs.opensearch.org/2.19/install-and-configure/install-opensearch/index/#important-settings
 
+OpenSearchを立ち上げる環境では以下の設定が必要
+
+```bash:/etc/sysctl.conf
+vm.max_map_count=262144
+```
+
+設定を確認
+```
+$ sudo sysctl -p
+$ sysctl vm.max_map_count
+```
+
 ## Front Server
 
 ### daemon
