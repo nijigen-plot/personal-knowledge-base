@@ -63,7 +63,6 @@ class ConversationResponse(BaseModel):
     used_knowledge: bool
     processing_time: float
     model_type: str
-    model_size: str
 
 
 embedding_model = None
@@ -193,7 +192,7 @@ api_router = APIRouter(prefix="/api/v1")
 
 
 @api_router.get("/", tags=["system"])
-async def root():
+def root():
     return {
         "message": "Quarkgabberの個人ナレッジベースAPIへようこそ",
         "description": "このAPIは、Quarkgabberの日常記録、体験談、知識が蓄積された個人ベクトルデータベースです。",
@@ -209,12 +208,12 @@ async def root():
 
 
 @api_router.head("/health", tags=["system"])
-async def health_check():
+def health_check():
     return {"status": "ok"}
 
 
 @api_router.post("/documents", tags=["documents"])
-async def add_document(
+def add_document(
     request: DocumentRequest,
     content_type: str = Depends(require_json_content_type),
     key: str = Depends(verify_api_key),
@@ -251,7 +250,7 @@ async def add_document(
 
 
 @api_router.post("/documents/batch", tags=["documents"])
-async def add_documents_batch(
+def add_documents_batch(
     requests: List[DocumentRequest],
     content_type: str = Depends(require_json_content_type),
     key: str = Depends(verify_api_key),
@@ -298,7 +297,7 @@ async def add_documents_batch(
 
 # SearchResultのtimestampを使えていない。後程考える
 @api_router.post("/search", response_model=List[SearchResult], tags=["search"])
-async def search_documents(
+def search_documents(
     request: SearchRequest, content_type: str = Depends(require_json_content_type)
 ):
     try:
@@ -334,7 +333,7 @@ async def search_documents(
 
 
 @api_router.get("/stats", response_model=IndexStats, tags=["admin"])
-async def get_index_stats(key: str = Depends(verify_api_key)):
+def get_index_stats(key: str = Depends(verify_api_key)):
     try:
         stats = vector_store.get_index_stats(INDEX_NAME)
 
@@ -354,7 +353,7 @@ async def get_index_stats(key: str = Depends(verify_api_key)):
 
 
 @api_router.delete("/index", tags=["admin"])
-async def reset_index(key: str = Depends(verify_api_key)):
+def reset_index(key: str = Depends(verify_api_key)):
     try:
         vector_store.delete_index(INDEX_NAME)
 
@@ -370,7 +369,7 @@ async def reset_index(key: str = Depends(verify_api_key)):
 
 
 @api_router.delete("/documents/{document_id}", tags=["documents"])
-async def delete_document(document_id: str, key: str = Depends(verify_api_key)):
+def delete_document(document_id: str, key: str = Depends(verify_api_key)):
     """特定のドキュメントIDのドキュメントを削除"""
     try:
         result = vector_store.delete_document(INDEX_NAME, document_id)
@@ -392,7 +391,7 @@ async def delete_document(document_id: str, key: str = Depends(verify_api_key)):
 @api_router.post(
     "/conversation", response_model=ConversationResponse, tags=["conversation"]
 )
-async def conversation_with_rag(
+def conversation_with_rag(
     request: ConversationRequest, content_type: str = Depends(require_json_content_type)
 ):
     """
@@ -463,7 +462,6 @@ async def conversation_with_rag(
             used_knowledge=used_knowledge,
             processing_time=round(total_end_time, 2),
             model_type=llm_model.model_type,
-            model_size=llm_model.model_size,
         )
 
     except Exception as e:
