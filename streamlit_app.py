@@ -1,8 +1,16 @@
+import os
 import time
 from typing import Generator
 
 import requests
 import streamlit as st
+from dotenv import load_dotenv
+
+from log_config import get_logger
+
+load_dotenv(".env")
+
+logger = get_logger(__name__)
 
 
 def post_conversation(prompt: str) -> Generator[str, None, None]:
@@ -21,7 +29,8 @@ def post_conversation(prompt: str) -> Generator[str, None, None]:
             "answer",
             "申し訳ありませんが、内部エラーにより回答できませんでした。管理者にお問い合わせください。",
         )
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
+        logger.error(f"APIリクエストエラー: {e}")
         response_str = "申し訳ありませんが、サーバーとの通信でエラーが発生しました。管理者にお問い合わせください。"
 
     for char in response_str:
