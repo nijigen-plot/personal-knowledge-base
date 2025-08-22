@@ -1,6 +1,11 @@
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
+# アーキテクチャ別のベースイメージを定義
+ARG TARGETPLATFORM TARGETARCH
 
-ARG TARGETARCH
+FROM --platform=$TARGETPLATFORM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04@sha256:46cb48a4abfbc40c836fe57bc05a07101b6458fffc63bbdfd6a50db98c9358bd AS base-amd64
+FROM --platform=$TARGETPLATFORM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04@sha256:2915b5ef3034f5e5de8cf787d84a2b9b455e34a71f93b2b62bde97faedef99ff AS base-arm64
+
+# アーキテクチャに応じて適切なベースイメージを選択
+FROM base-${TARGETARCH} AS base
 
 SHELL ["/bin/bash", "-c"]
 
