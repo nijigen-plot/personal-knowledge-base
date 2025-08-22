@@ -15,7 +15,7 @@ from transformers import pipeline
 from log_config import get_logger
 
 # 環境変数読み込み
-load_dotenv()
+load_dotenv(".env")
 
 logger = get_logger(__name__)
 

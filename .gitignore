@@ -30,3 +30,12 @@ old_docs/*
 
 # log file
 *.log
+
+# cache
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Streamlit
+.streamlit/
