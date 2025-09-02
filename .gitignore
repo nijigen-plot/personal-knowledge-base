@@ -39,3 +39,10 @@ old_docs/*
 
 # Streamlit
 .streamlit/
+
+# Dependency directories
+node_modules/
+mcp-server/node_modules/
+
+# Wrangler
+mcp-server/.wrangler/
