@@ -11,20 +11,30 @@ export class MyMCP extends McpAgent {
 	async init() {
 		this.server.tool(
 			// ツールの名前
-			'dice_roll',
+			'quarkgabber-knowledge-base-search',
 			// ツールの説明
-			'サイコロを降った結果を返します',
+			'QuarkgabberナレッジベースAPI searchにアクセスしレスポンスを受け取ります。',
 			// ツールの引数のスキーマ
-			{ sides: z.number().min(1).max(100).default(6).describe('サイコロの面の数') },
+            { query: z.string().describe('検索クエリ')},
 			// ツールの実行関数
-			async ({ sides }) => {
-				// サイコロを振る
-				const result = Math.floor(Math.random() * sides) + 1;
-				// 結果を返す
-				return {
-					content: [{ type: 'text', text: result.toString() }],
-				};
-			}
-		);
-	}
+            async (args: any) => {
+                const { query } = args;
+                const response = await fetch('https://home.quark-hardcore.com/personal-knowledge-base/api/v1/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        k: 10
+                    })
+                });
+
+                const data = await response.json();
+
+                return {
+                    content: [{ type: 'text', text: JSON.stringify(data, null, 2)}]
+                };
+        });
+    }
 }
