@@ -39,3 +39,7 @@ old_docs/*
 
 # Streamlit
 .streamlit/
+
+
+# Dependency directories
+node_modules/
