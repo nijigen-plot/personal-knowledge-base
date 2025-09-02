@@ -1,15 +1,18 @@
-# これはなに
+# Knowledge Base
 
 [nijigen-plot](https://x.com/nijigen_plot)([Quarkgabber](https://x.com/Quarkgabber))のナレッジベースです。
+
+要するに私について質問ができます！
+
 2012年からの過去ツイートと、2025年からちょいちょい入れてる日常系データをRAGとしています。
 
-![アーキテクチャ図](./architecture.png)
+![アーキテクチャ図](./images/architecture.png)
 
 [全体像について記載した記事](https://zenn.dev/nijigen_plot/articles/personal_knowledge_base)
 
-# 使い方
+## 使い方
 
-## StreamlitチャットBOT
+### StreamlitチャットBOT
 
 質問に対する回答(conversation API)をしてくれるアプリ
 
@@ -26,11 +29,57 @@ https://home.quark-hardcore.com/personal-knowledge-base/app/
 
 
 
-## MCP(Coming soon...)
+## Remote MCP
 
-# Setup
+### 利用方法
 
-## .env
+MCP Settingにて以下を追加して再起動で認識されたらOK
+
+```json
+{
+  "mcpServers": {
+    "calculator": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        my-mcp-server.your-account.workers.dev/sse
+      ]
+    }
+  }
+}
+```
+
+### ローカル開発&Deploy
+
+CloudFlareでRemote MCP Serverをホストしています。
+
+`cd ./mcp-server`後`npm run deploy`でローカルMCPサーバーが立ちます。
+
+`npx @modelcontextprotocol/inspector@latest`で[MCP Inspector](https://modelcontextprotocol.io/legacy/tools/inspector)が立ちます。
+
+Transport Type: sse
+URL : http://localhost:8787/sse
+
+に設定し接続、List ToolsからToolを選んでRun Tool
+問題無ければレスポンスが返ります。
+
+`npm run deploy`でCloudFlareにDeploy(初回のみOAuth認証が入ります)
+
+MCP InspectorでURLをCloudFlareにDeployして発行されたURL/sseに差し替えます。
+
+これでも問題無ければリモートで動いてる
+
+![成功例](./images/screenshot2025-09-02231313.png)
+
+#### 参考
+
+https://azukiazusa.dev/blog/cloudflare-mcp-server/
+
+https://developers.cloudflare.com/agents/guides/remote-mcp-server/
+
+## Setup
+
+### .env
 
 1. `cp .env.example .env`
 2. .envの各項目に値を記入
@@ -41,7 +90,8 @@ https://home.quark-hardcore.com/personal-knowledge-base/app/
 7. `source ~/.bashrc` (.bashrcに`eval "$(direnv hook bash)"`があること前提)
 8. `direnv allow`
 
-## 共通設定
+### 共通設定
+
 結局LLMはOpenAIが安定という結論になったので、デフォルトOPENAI APIを使っています。
 .envに`OPENAPI_API_KEY=`があるのでそれにKEYいれてください。
 
@@ -61,14 +111,14 @@ https://home.quark-hardcore.com/personal-knowledge-base/app/
 14. run `uv run uvicorn app:app --reload --port $APP_PORT --host $APP_HOST` or `uv run python app.py`(FastAPI立ち上げ)
 15. run `uv run streamlit run streamlit_app.py --server.port $STREAMLIT_APP_PORT` (192.168.0.44 チャットBOT用Streamlit立ち上げ)
 
-## API Server
+### API Server
 
-## LLM Server
+### LLM Server
 
 1. run `docker build -f llm.Dockerfile . -t llm-server`
 2. run `docker run --gpus all -v ./gpt-oss-20b:/app/gpt-oss-20b llm-server`
 
-## OpenSearch Server
+### OpenSearch Server
 
 セキュリティやらmax_map_countやらで落とし穴多い
 
@@ -86,16 +136,15 @@ $ sudo sysctl -p
 $ sysctl vm.max_map_count
 ```
 
-## Front Server
+### Front Server
 
-### daemon
+#### daemon
 - 192.168.0.46 : `/etc/systemd/system/personal-knowledge-base-fastapi.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
 - 192.168.0.44 : `/etc/systemd/system/personal-knowledge-base-streamlit.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
     - `start_streamlit.sh`をdaemonで実行している
 
-### Apache mod_proxy
 
-## 過去データの挿入
+### 過去データの挿入
 
 FastAPI経由でリクエストを送ってデータ挿入が可能
 ADMIN_API_KEYに設定した値をBearer Tokenとして認証が必要
@@ -126,7 +175,7 @@ response = requests.post(
 )
 ```
 
-## LLMのテスト
+### LLMのテスト
 
 普通の会話
 ```
@@ -173,61 +222,23 @@ $ uv run python llm.py "最近あった音楽関係の出来事は？" --extract
 言語モデルのメモリ解放完了
 ```
 
-## 構成
+### 構成
 
 - OpenSearchは192.168.0.45でホスト（OpenSearch用サーバー）
 - FastAPIは192.168.0.46でホスト（LLM+Embedding用サーバー）
 - APIの公開は192.168.0.44がSSL証明書を持っている&プロキシサーバーを立てているのでリバースプロキシしてFastAPIにアクセスさせてます
     - 設定内容は192.168.0.44の`/etc/apache2/sites-enabled/`を参照
 
-# API
+## 開発
 
-## 入力構成
-
-- Timestamp (自動ではいる)
-    - Optionalにして過去文書を入れる時は明示できるようにする
-- タグ(話題が何に関連するものなのか。LLM側でタグを自動で選定してくれる)
-    - lifestyle, music, technology
-- 質問文(自由入力)
-
-# 開発
-
-## Formatter/CI
+### Formatter/CI
 
 `uv run pre-commit run --all-files`でコミット前にフォーマットチェック
 
-# モデルのメモリ解放について
+### モデルのメモリ解放について
 
 https://github.com/mjun0812/hf-model-cleanup-experiment
 
 > export MALLOC_TRIM_THRESHOLD_=-1 + del model; gc.collect();で削除
 
 gemma3.py, embedding_model.pyに内容は記載
-
-# CPUメモ
-
-1. Raspberry Pi 5はBCM2712 SoCで、CPUはArm Cortex-A76 (https://eetimes.itmedia.co.jp/ee/articles/2309/28/news177.html)
-2. Cortex-A76はARM v8.2-Aアーキテクチャで半精度16bitの計算に対応している (https://en.wikipedia.org/wiki/AArch64#ARMv8.2-A)
-3. Intel x86 CPUは4世代Xeonから半精度16bit計算対応で普通の人はまず持ってない (https://zenn.dev/mod_poppo/articles/half-precision-floating-point)
-    a. 変換はIvy Bridgeから対応(3世代)
-
-# Benchmarkメモ
-
-4bは簡素で1bは文章量が多いので生成秒数が逆転している
-リアルタイムで描画するようにしたらまた評価かわるかも
-google gemma 3 1b ggufはめっちゃ速い 3~5秒くらい。Raspberry Pi 5なら7秒くらい
-
-最終RAGをを分かったこととしては、Gemma 3 1b,4bはRAGのコンテキストを自分として活用するほどの能力はない。
-ということで結局OpenAI API GPT 4oを使っています。
-
-## i9-9980XE
-
-- 4b -> 10秒程
-- 1b -> 30秒程
-- 1b gguf -> 3秒程
-
-## Cortex-A76
-
-- 4b -> 40~50秒
-- 1b -> 40~50秒
-- 1b gguf -> 7秒程
