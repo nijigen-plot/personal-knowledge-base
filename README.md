@@ -42,12 +42,15 @@ MCP Settingにて以下を追加して再起動で認識されたらOK
       "command": "npx",
       "args": [
         "mcp-remote",
-        my-mcp-server.your-account.workers.dev/sse
+        "my-mcp-server.your-account.workers.dev/sse"
       ]
     }
   }
 }
 ```
+
+
+Claude Desktopの場合は設定→コネクタ→カスタムコネクタを追加で/sse付きURLを入れることで追加できた
 
 ### ローカル開発&Deploy
 
