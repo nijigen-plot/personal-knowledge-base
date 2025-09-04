@@ -107,7 +107,9 @@ https://developers.cloudflare.com/agents/guides/remote-mcp-server/
 7. install [git lfs](https://github.com/git-lfs/git-lfs/wiki/Installation)
 8. (必須ではない)clone llm repository `git clone git@hf.co:google/gemma-3-1b-it-qat-q4_0-gguf`(Need Write Permission Access Token)
 9. git embedding model repository `git clone git@hf.co:pfnet/plamo-embedding-1b`
-10. run `docker compose up -d` (OpenSearch Server 専用のサーバー 192.168.0.45があるのでそっちで立ち上げ済)
+10. run `docker compose --profile xxx up -d` (OpenSearch Server 専用のサーバー 192.168.0.45があるのでそっちで立ち上げ済)
+  a. Dev環境なら--profile dev
+  b. 本番環境は役割毎にPC違うのでそのprofileを指定
 11. run `docker compose ps -a` で立ち上がっているかチェック
 12. run `curl https://localhost:9200 -ku username:password` で情報が返ってくるかチェック
 13. run `uv run pytest test_app.py` （単体テスト）
