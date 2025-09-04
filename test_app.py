@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -35,7 +36,7 @@ def mock_vector_store():
             "score": 0.9,
             "content": "これはテストドキュメントです",
             "tag": "music",
-            "timestamp": "2024-01-01T00:00:00.000000",
+            "timestamp": "2024-01-01 09:00:00+09:00",
         }
     ]
     mock_store.get_index_stats.return_value = {
@@ -145,6 +146,11 @@ class TestSearchEndpoint:
         assert result["score"] == 0.9
         assert result["content"] == "これはテストドキュメントです"
         assert result["tag"] == "music"
+        assert result["timestamp"] == str(
+            datetime.fromisoformat("2024-01-01T00:00:00.000000")
+            .replace(tzinfo=timezone.utc)
+            .astimezone(timezone(timedelta(hours=9)))
+        )
 
         # モックが正しく呼び出されたことを確認
         mock_embedding_model.encode.assert_called_once_with(["テスト"])

@@ -163,9 +163,11 @@ class OpenSearchVectorStore:
                 "score": hit["_score"],
                 "content": hit["_source"]["content"],
                 "tag": hit["_source"]["tag"],
-                "timestamp": datetime.fromisoformat(hit["_source"]["timestamp"])
-                .replace(tzinfo=timezone.utc)
-                .astimezone(timezone(timedelta(hours=9))),
+                "timestamp": str(
+                    datetime.fromisoformat(hit["_source"]["timestamp"])
+                    .replace(tzinfo=timezone.utc)
+                    .astimezone(timezone(timedelta(hours=9)))
+                ),
             }
             results.append(result)
 
