@@ -87,7 +87,6 @@ services:
     command: "uv run uvicorn app:app --reload --port ${APP_PORT} --host ${APP_HOST}"
     volumes:
       - ./:/app
-      - /app/.venv
     depends_on:
       opensearch-node1:
         condition: service_healthy # Wait for OpenSearch to be healthy before starting FastAPI
@@ -114,7 +113,6 @@ services:
     command: "uv run uvicorn app:app --reload --port ${APP_PORT} --host ${APP_HOST}"
     volumes:
       - ./:/app
-      - /app/.venv
     restart: always
   streamlit:
     build:
@@ -130,7 +128,6 @@ services:
     command: "uv run streamlit run streamlit_app.py --server.port ${STREAMLIT_APP_PORT}"
     volumes:
       - ./:/app
-      - /app/.venv
     depends_on:
       - fastapi
     networks:
@@ -150,7 +147,6 @@ services:
     command: "uv run streamlit run streamlit_app.py --server.port ${STREAMLIT_APP_PORT}"
     volumes:
       - ./:/app
-      - /app/.venv
     restart: always
 
 volumes:
