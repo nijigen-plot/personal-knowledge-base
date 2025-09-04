@@ -148,6 +148,49 @@ $ sysctl vm.max_map_count
 - 192.168.0.44 : `/etc/systemd/system/personal-knowledge-base-streamlit.service`で起動時立ち上がるように設定済み。HOST,PORTは直接書いてるので要確認
     - `start_streamlit.sh`をdaemonで実行している
 
+#### Streamlit Meta
+
+https://discuss.streamlit.io/t/adding-a-meta-description-to-your-streamlit-app/17847/5
+
+`.venv/lib/python3.11/site-packages/streamlit/static/index.html`を以下のように変更すると、URL埋め込みで情報が反映される。
+これはgit管理外なので適宜対応
+
+
+```
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta property="og:title" content="Quarkgabber Knowledge Base">
+    <meta property="og:url" content="https://home.quark-hardcore.com/personal-knowledge-base/app/">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <link rel="shortcut icon" href="./favicon.png" />
+    <link
+      rel="preload"
+      href="./static/media/SourceSansVF-Upright.ttf.BsWL4Kly.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    <title>Quarkgabber Knowledge Base</title>
+
+    <!-- initialize window.prerenderReady to false and then set to true in React app when app is ready for indexing -->
+    <script>
+      window.prerenderReady = false
+    </script>
+    <script type="module" crossorigin src="./static/js/index.DvRPFfw6.js"></script>
+    <link rel="stylesheet" crossorigin href="./static/css/index.CJVRHjQZ.css">
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+```
 
 ### 過去データの挿入
 
