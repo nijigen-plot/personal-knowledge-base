@@ -311,7 +311,7 @@ class LargeLanguageModel:
             r"今日|きょう": (0, "days"),
             r"昨日|きのう": (1, "days"),
             r"一昨日|おととい": (2, "days"),
-            r"最近|近頃": (7, "days"),
+            r"最近|近頃": (6, "months"),
             r"先週|前週": (7, "days"),
             r"今週|こんしゅう": (0, "days"),
             r"先月|前月": (30, "days"),
