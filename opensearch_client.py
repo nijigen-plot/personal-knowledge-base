@@ -177,7 +177,7 @@ class OpenSearchVectorStore:
     def delete_document(self, index_name: str, document_id: str) -> Dict[str, Any]:
         """特定のドキュメントIDのドキュメントを削除"""
         try:
-            if not self.client.indices.exists(index_name):
+            if not self.client.indices.exists(index=index_name):
                 return {"error": f"インデックスが存在しません: {index_name}"}
 
             response = self.client.delete(index=index_name, id=document_id)
