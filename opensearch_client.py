@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -162,7 +163,9 @@ class OpenSearchVectorStore:
                 "score": hit["_score"],
                 "content": hit["_source"]["content"],
                 "tag": hit["_source"]["tag"],
-                "timestamp": hit["_source"]["timestamp"],
+                "timestamp": datetime.fromisoformat(hit["_source"]["timestamp"])
+                .replace(tzinfo=timezone.utc)
+                .astimezone(timezone(timedelta(hours=9))),
             }
             results.append(result)
 
