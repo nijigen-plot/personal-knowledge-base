@@ -314,8 +314,7 @@ def search_documents(
     request: SearchRequest, content_type: str = Depends(require_json_content_type)
 ):
     try:
-        start_time = time.perf_counter()
-
+        logger.info(f"検索文 : {request.query}")
         query_embedding = embedding_model.encode([request.query])
 
         results = vector_store.search(
@@ -325,8 +324,6 @@ def search_documents(
             tag_filter=request.tag_filter,
             timestamp_filter=request.timestamp_filter,
         )
-
-        end_time = time.perf_counter()
 
         search_results = [
             SearchResult(
@@ -411,6 +408,7 @@ def conversation_with_rag(
     RAGを使用した会話: 質問→Embedding→OpenSearch検索→LLMが回答
     """
     try:
+        logger.info(f"質問文 : {request.question}")
         total_start_time = time.perf_counter()
 
         # 1. 質問からタグとタイムスタンプを抽出
