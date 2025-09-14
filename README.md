@@ -80,6 +80,22 @@ https://azukiazusa.dev/blog/cloudflare-mcp-server/
 
 https://developers.cloudflare.com/agents/guides/remote-mcp-server/
 
+## Slack
+
+個人用Slackチャンネルで@quarkgabber(bot)宛てにメンションすればOK
+
+### ローカル開発
+
+FastAPIの開いているポートに対して[ngrok](https://ngrok.com/)で公開してEvent Subscriptionsの挙動を試す
+
+`docker compose --profile dev`でFastAPIを立ち上げたうえで
+
+```
+$ ngrok http 8050(FastAPIのPort)
+```
+
+発行されたURL + /api/v1/slack/eventsでEvent SubscriptionsのURLに登録
+
 ## Setup
 
 ### .env
@@ -135,7 +151,7 @@ OpenSearchを立ち上げる環境では以下の設定が必要
 vm.max_map_count=262144
 ```
 
-設定を確認
+設定を確認(これ何故かローカル環境コマンド実行しなおさないと読んでくれない)
 ```
 $ sudo sysctl -p
 $ sysctl vm.max_map_count

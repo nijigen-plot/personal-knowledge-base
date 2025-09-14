@@ -2,10 +2,11 @@ import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
+import requests
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -63,6 +64,19 @@ class ConversationResponse(BaseModel):
     used_knowledge: bool
     processing_time: float
     model_type: str
+
+
+class SlackEventRequest(BaseModel):
+    token: str
+    team_id: str
+    api_app_id: str
+    event: dict[str, Any]
+    type: str
+    event_id: str
+    event_time: int
+    authorizations: List[dict]
+    is_ext_shared_channel: bool
+    event_context: str
 
 
 embedding_model = None
@@ -164,9 +178,7 @@ security = HTTPBearer(
 
 def require_json_content_type(content_type: str = Header(..., alias="content-type")):
     if content_type.lower() != "application/json":
-        raise HTTPException(
-            status_code=400, detail="Content-Type must be application/json"
-        )
+        raise HTTPException(status_code=400, detail="Content-Type must be application/json")
     return content_type
 
 
@@ -233,16 +245,12 @@ def add_document(
             "content": request.content,
         }
 
-        success_count, failed_items = vector_store.add_documents(
-            INDEX_NAME, [document], embedding
-        )
+        success_count, failed_items = vector_store.add_documents(INDEX_NAME, [document], embedding)
 
         end_time = time.perf_counter()
 
         if failed_items:
-            raise HTTPException(
-                status_code=500, detail="ドキュメントの保存に失敗しました"
-            )
+            raise HTTPException(status_code=500, detail="ドキュメントの保存に失敗しました")
 
         return {
             "message": "ドキュメントが正常に追加されました",
@@ -279,17 +287,11 @@ def add_documents_batch(
                 # timestampがNoneの場合は現在時刻を設定
                 timestamp = req.timestamp
                 if timestamp is None:
-                    timestamp = datetime.now(timezone.utc).strftime(
-                        "%Y-%m-%dT%H:%M:%S.%f"
-                    )
+                    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
-                documents.append(
-                    {"tag": req.tag, "timestamp": timestamp, "content": req.content}
-                )
+                documents.append({"tag": req.tag, "timestamp": timestamp, "content": req.content})
 
-            success_count, failed_items = vector_store.add_documents(
-                INDEX_NAME, documents, embeddings
-            )
+            success_count, failed_items = vector_store.add_documents(INDEX_NAME, documents, embeddings)
 
             total_success_count += success_count
             if failed_items:
@@ -310,9 +312,7 @@ def add_documents_batch(
 
 # SearchResultのtimestampを使えていない。後程考える
 @api_router.post("/search", response_model=List[SearchResult], tags=["search"])
-def search_documents(
-    request: SearchRequest, content_type: str = Depends(require_json_content_type)
-):
+def search_documents(request: SearchRequest, content_type: str = Depends(require_json_content_type)):
     try:
         logger.info(f"検索文 : {request.query}")
         query_embedding = embedding_model.encode([request.query])
@@ -362,6 +362,42 @@ def get_index_stats(key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=500, detail=f"統計取得エラー: {str(e)}")
 
 
+def process_slack_message(event_data: dict):
+    """バックグラウンドでSlackメッセージを処理"""
+    question = event_data.get("text")
+    channel = event_data.get("channel")
+    thread = event_data.get("ts")
+
+    try:
+        conv_request = ConversationRequest(question=question)
+        conv_response = conversation_with_rag(conv_request)
+        answer = conv_response.answer
+
+        requests.post(
+            "https://slack.com/api/chat.postMessage",
+            json={"channel": channel, "thread_ts": thread, "text": answer},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {os.getenv('SLACK_BOT_USER_OAUTH_TOKEN')}",
+            },
+        )
+    except Exception as e:
+        logger.error(f"Slack処理エラー: {e}")
+
+
+@api_router.post("/slack/events", tags=["conversation"])
+async def slack_events(request: SlackEventRequest, background_tasks: BackgroundTasks):
+    if request.type == "url_verification":
+        return {"status": "ok"}
+
+    if request.event.get("type") == "app_mention":
+        logger.info(f"Slack app mention received: {request.event.get('text')}")
+        # Slack APIは3秒以内にレスポンスを返さないと失敗扱いになるので、バックグラウンドで処理する
+        background_tasks.add_task(process_slack_message, request.event)
+
+    return {"status": "ok"}
+
+
 @api_router.delete("/index", tags=["admin"])
 def reset_index(key: str = Depends(verify_api_key)):
     try:
@@ -373,9 +409,7 @@ def reset_index(key: str = Depends(verify_api_key)):
         return {"message": "インデックスがリセットされました"}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"インデックスリセットエラー: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"インデックスリセットエラー: {str(e)}")
 
 
 @api_router.delete("/documents/{document_id}", tags=["documents"])
@@ -398,12 +432,8 @@ def delete_document(document_id: str, key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=500, detail=f"ドキュメント削除エラー: {str(e)}")
 
 
-@api_router.post(
-    "/conversation", response_model=ConversationResponse, tags=["conversation"]
-)
-def conversation_with_rag(
-    request: ConversationRequest, content_type: str = Depends(require_json_content_type)
-):
+@api_router.post("/conversation", response_model=ConversationResponse, tags=["conversation"])
+def conversation_with_rag(request: ConversationRequest, content_type: str = Depends(require_json_content_type)):
     """
     RAGを使用した会話: 質問→Embedding→OpenSearch検索→LLMが回答
     """
