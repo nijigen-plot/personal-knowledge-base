@@ -6,7 +6,7 @@ from typing import Any, List, Literal, Optional
 
 import requests
 from dotenv import load_dotenv
-from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Header, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -64,19 +64,6 @@ class ConversationResponse(BaseModel):
     used_knowledge: bool
     processing_time: float
     model_type: str
-
-
-class SlackEventRequest(BaseModel):
-    token: str
-    team_id: str
-    api_app_id: str
-    event: dict[str, Any]
-    type: str
-    event_id: str
-    event_time: int
-    authorizations: List[dict]
-    is_ext_shared_channel: bool
-    event_context: str
 
 
 embedding_model = None
@@ -386,14 +373,16 @@ def process_slack_message(event_data: dict):
 
 
 @api_router.post("/slack/events", tags=["conversation"])
-async def slack_events(request: SlackEventRequest, background_tasks: BackgroundTasks):
-    if request.type == "url_verification":
-        return {"status": "ok"}
+async def slack_events(request: Request, background_tasks: BackgroundTasks):
+    body = await request.json()
+    logger.info(f"Slackからの質問文 : {body}")
+    if body.get("type") == "url_verification":
+        return body["challenge"]
 
-    if request.event.get("type") == "app_mention":
-        logger.info(f"Slack app mention received: {request.event.get('text')}")
+    if body["event"].get("type") == "app_mention":
+        logger.info(f"Slack app mention received: {body['event'].get('text')}")
         # Slack APIは3秒以内にレスポンスを返さないと失敗扱いになるので、バックグラウンドで処理する
-        background_tasks.add_task(process_slack_message, request.event)
+        background_tasks.add_task(process_slack_message, body["event"])
 
     return {"status": "ok"}
 
