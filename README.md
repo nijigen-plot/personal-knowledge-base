@@ -151,7 +151,7 @@ OpenSearchを立ち上げる環境では以下の設定が必要
 vm.max_map_count=262144
 ```
 
-設定を確認
+設定を確認(これ何故かローカル環境コマンド実行しなおさないと読んでくれない)
 ```
 $ sudo sysctl -p
 $ sysctl vm.max_map_count
