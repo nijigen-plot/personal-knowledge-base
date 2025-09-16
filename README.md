@@ -6,9 +6,10 @@
 
 2012年からの過去ツイートと、2025年からちょいちょい入れてる日常系データをRAGとしています。
 
+[全体像について記載した記事](https://zenn.dev/nijigen_plot/articles/personal_knowledge_base)
+
 ![アーキテクチャ図](./images/architecture.png)
 
-[全体像について記載した記事](https://zenn.dev/nijigen_plot/articles/personal_knowledge_base)
 
 ## 使い方
 
@@ -71,7 +72,6 @@ URL : http://localhost:8787/sse
 MCP InspectorでURLをCloudFlareにDeployして発行されたURL/sseに差し替えます。
 
 これでも問題無ければリモートで動いてる
-
 ![成功例](./images/screenshot2025-09-02231313.png)
 
 #### 参考
