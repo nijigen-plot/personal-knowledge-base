@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import json
 import os
 import time
 from contextlib import asynccontextmanager
@@ -374,12 +377,35 @@ def process_slack_message(event_data: dict):
 
 @api_router.post("/slack/events", tags=["conversation"])
 async def slack_events(request: Request, background_tasks: BackgroundTasks):
-    body = await request.json()
+    body_str = (await request.body()).decode("utf-8")
+    body = json.loads(body_str)
+    headers = dict(request.headers)
+    slack_signature = headers.get("x-slack-signature")
+    slack_timestamp = headers.get("x-slack-request-timestamp", "0")
+    slack_signing_secret = os.getenv("SLACK_SIGNING_SECRET")
+    base_str = f"v0:{slack_timestamp}:{body_str}"
+    signature = f"""v0={hmac.new(
+            bytes(slack_signing_secret, "UTF-8"),
+            bytes(base_str, "UTF-8"),
+            hashlib.sha256
+        ).hexdigest()}"""
     logger.info(f"Slackからの質問文 : {body}")
+
+    # Event Subscriptions URL検証の場合はchallengeを返す
     if body.get("type") == "url_verification":
         return body["challenge"]
 
-    if body["event"].get("type") == "app_mention":
+    if slack_signing_secret is None:
+        logger.error("x-slack-signatureヘッダーがありませんでした")
+        return {"status": "ok"}
+
+    if abs(time.time() - int(slack_timestamp)) > 60 * 5:
+        logger.info(f"Slackリクエストのタイムスタンプが古すぎます: {slack_timestamp}")
+        return {"status": "ok"}
+
+    logger.info(f"Slack署名: {slack_signature}, 計算署名: {signature}")
+
+    if (body["event"].get("type") == "app_mention") & (hmac.compare_digest(signature, slack_signature)):
         logger.info(f"Slack app mention received: {body['event'].get('text')}")
         # Slack APIは3秒以内にレスポンスを返さないと失敗扱いになるので、バックグラウンドで処理する
         background_tasks.add_task(process_slack_message, body["event"])
