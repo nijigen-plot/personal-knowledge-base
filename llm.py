@@ -252,7 +252,7 @@ class LargeLanguageModel:
 
         try:
             response = self.model.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-6-sol",
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
