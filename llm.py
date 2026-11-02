@@ -24,6 +24,12 @@ os.environ["MALLOC_TRIM_THRESHOLD_"] = "-1"
 
 HISTORY_FILE = "history.txt"
 
+# OpenAI API の設定（.env で上書き可能）
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-6-sol")
+# gpt-6-sol は none / low / medium(既定) / high / xhigh / max に対応。
+# none にすると推論をせず gpt-4o と同じ感覚で使え、temperature も指定できる。
+OPENAI_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT", "none")
+
 
 class LargeLanguageModel:
     def __init__(self, model_type: str = "openai-api"):
@@ -241,28 +247,39 @@ class LargeLanguageModel:
                     user_text += content["text"] + "\n"
                 openai_messages.append({"role": "user", "content": user_text})
 
+        # 新しいモデルは max_tokens を受け付けないので max_completion_tokens を使う。
+        # 推論をする設定（none 以外）では temperature を送るとエラーになるので外す。
+        request_params: Dict[str, Any] = {
+            "model": OPENAI_MODEL,
+            "messages": openai_messages,
+            "max_completion_tokens": max_tokens,
+            "reasoning_effort": OPENAI_REASONING_EFFORT,
+            "stream": stream,
+        }
+        if OPENAI_REASONING_EFFORT == "none":
+            request_params["temperature"] = temperature
+
         try:
-            response = self.model.chat.completions.create(
-                model="gpt-6-sol",
-                messages=openai_messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                stream=stream,
-            )
+            response = self.model.chat.completions.create(**request_params)
 
             if stream:
                 partial_message = ""
                 for chunk in response:
-                    if chunk.choices[0].delta.content is not None:
-                        content = chunk.choices[0].delta.content
+                    # 最後に choices が空のチャンクが来ることがあるので飛ばす
+                    if not chunk.choices:
+                        continue
+                    content = chunk.choices[0].delta.content
+                    if content:
                         if not silent:
                             print(content, end="", flush=True)
                         partial_message += content
                 if not silent:
-                    print(content)
+                    print()
                 return partial_message.strip()
             else:
-                content = response.choices[0].message.content
+                content = response.choices[0].message.content or ""
+                if not content:
+                    logger.warning(f"空の応答でした (finish_reason={response.choices[0].finish_reason})")
                 if not silent:
                     print(content)
                 return content.strip()

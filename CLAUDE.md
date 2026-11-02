@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. **Embedding Layer**: PlamoEmbedding (pfnet/plamo-embedding-1b) でドキュメントのベクトル化
 2. **Vector Store**: OpenSearch でベクトル検索とフィルタリング
-3. **LLM Layer**: OpenAI GPT-4o または Gemma 3 モデルで対話生成
+3. **LLM Layer**: OpenAI GPT-6 Sol（`OPENAI_MODEL` で変更可）または gpt-oss-20b で対話生成
 4. **API Layer**: FastAPI (app.py) でRESTful APIを提供
 5. **Frontend Layer**: Streamlit (streamlit_app.py) でWebチャットインターフェース
 
@@ -105,7 +105,7 @@ uv run isort .
 ### コアコンポーネント
 
 1. **llm.py** - 統合言語モデルクラス
-   - OpenAI GPT-4o API (`model_type="openai-api"`)
+   - OpenAI API (`model_type="openai-api"`、既定は `gpt-6-sol` + `reasoning_effort=none`)
    - ローカルモデル (`model_type="openai-20b"`) - `./gpt-oss-20b`モデル使用
    - 会話履歴管理 (`history.txt`) とタグ・タイムスタンプ抽出機能
    - RAGコンテキスト統合と一人称回答生成
@@ -220,7 +220,7 @@ OPENSEARCH_DASHBOARD_PORT=5601
 
 ### パフォーマンス特性
 - **Gemma 3 1B/4B**: ローカル推論可能だがRAG能力限定
-- **OpenAI GPT-4o**: RAG統合と一人称回答に最適（現在のデフォルト）
+- **OpenAI GPT-6 Sol**: RAG統合と一人称回答（現在のデフォルト。`OPENAI_MODEL` / `OPENAI_REASONING_EFFORT` で変更可）
 - **PlamoEmbedding**: 日本語ベクトル化に特化
 
 ### デバッグとモニタリング
