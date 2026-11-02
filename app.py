@@ -393,6 +393,7 @@ async def slack_events(request: Request, background_tasks: BackgroundTasks):
 
     # Event Subscriptions URL検証の場合はchallengeを返す
     if body.get("type") == "url_verification":
+        logger.info("Slack URL verification request received")
         return body["challenge"]
 
     if slack_signing_secret is None:
@@ -402,8 +403,6 @@ async def slack_events(request: Request, background_tasks: BackgroundTasks):
     if abs(time.time() - int(slack_timestamp)) > 60 * 5:
         logger.info(f"Slackリクエストのタイムスタンプが古すぎます: {slack_timestamp}")
         return {"status": "ok"}
-
-    logger.info(f"Slack署名: {slack_signature}, 計算署名: {signature}")
 
     if (body["event"].get("type") == "app_mention") & (hmac.compare_digest(signature, slack_signature)):
         logger.info(f"Slack app mention received: {body['event'].get('text')}")
