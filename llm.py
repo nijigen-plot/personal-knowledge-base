@@ -41,9 +41,7 @@ class LargeLanguageModel:
         elif model_type == "openai-20b":
             self._load_openai_20b_client()
         else:
-            raise ValueError(
-                "model_typeは'openaiapi' または'openai-20b'を指定してください"
-            )
+            raise ValueError("model_typeは'openaiapi' または'openai-20b'を指定してください")
 
     def _load_openai_20b_client(self):
         """PyTorchモデルを読み込み"""
@@ -78,9 +76,7 @@ class LargeLanguageModel:
             logger.info(f"{HISTORY_FILE} から過去の会話履歴を読み込みました。")
             return memory
         else:
-            logger.info(
-                f"{HISTORY_FILE} が存在しないため、過去の会話履歴は考慮されません。"
-            )
+            logger.info(f"{HISTORY_FILE} が存在しないため、過去の会話履歴は考慮されません。")
             return ""
 
     def _save_memory(self, message: str):
@@ -200,18 +196,13 @@ class LargeLanguageModel:
 
         # モデル生成関数のマッピング
         generators = {
-            "openai-api": lambda: self._generate_openai(
-                messages, stream, max_tokens, temperature, silent
-            ),
+            "openai-api": lambda: self._generate_openai(messages, stream, max_tokens, temperature, silent),
             "openai-20b": lambda: self._generate_pytorch(messages, max_tokens, silent),
         }
 
         generator = generators.get(self.model_type)
         if not generator:
-            raise ValueError(
-                f"未対応のmodel_type: {self.model_type}. "
-                f"対応可能: {list(generators.keys())}"
-            )
+            raise ValueError(f"未対応のmodel_type: {self.model_type}. " f"対応可能: {list(generators.keys())}")
 
         response_text = generator()
 
@@ -279,9 +270,7 @@ class LargeLanguageModel:
             logger.error(f"OpenAI API呼び出しエラー: {e}")
             return f"エラーが発生しました: {e}"
 
-    def _generate_pytorch(
-        self, messages: List[Dict[str, Any]], max_tokens: int, silent: bool = False
-    ) -> str:
+    def _generate_pytorch(self, messages: List[Dict[str, Any]], max_tokens: int, silent: bool = False) -> str:
         """PyTorch モデルでテキスト生成"""
         # messagesをchat templateで処理
         output = self.model(messages, max_new_tokens=max_tokens)
@@ -429,9 +418,7 @@ class LargeLanguageModel:
                         return final_result
 
             except (json.JSONDecodeError, KeyError, TypeError) as e:
-                logger.warning(
-                    f"JSON解析エラー (試行 {attempt + 1}/{max_retries}): {e}"
-                )
+                logger.warning(f"JSON解析エラー (試行 {attempt + 1}/{max_retries}): {e}")
                 continue
 
         # 3回リトライした場合はcontentと正規表現抽出結果を返す
@@ -521,14 +508,10 @@ def main():
         default="openai-api",
         help="使用するモデルタイプ (デフォルト: openai-api)",
     )
-    parser.add_argument(
-        "--no-stream", action="store_true", help="ストリーミング出力を無効化"
-    )
+    parser.add_argument("--no-stream", action="store_true", help="ストリーミング出力を無効化")
     parser.add_argument("--no-history", action="store_true", help="会話履歴を無効化")
     parser.add_argument("--max-tokens", type=int, default=512, help="最大トークン数")
-    parser.add_argument(
-        "--temperature", type=float, default=0.3, help="生成の温度パラメータ"
-    )
+    parser.add_argument("--temperature", type=float, default=0.3, help="生成の温度パラメータ")
     parser.add_argument(
         "--extract-tag",
         action="store_true",

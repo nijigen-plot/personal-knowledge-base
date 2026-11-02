@@ -17,9 +17,7 @@ logger = get_logger(__name__)
 def mock_embedding_model():
     """エンベディングモデルのモック"""
     mock_model = Mock()
-    mock_model.encode.return_value = np.array(
-        [[0.1, 0.2, 0.3, 0.4]]
-    )  # 4次元のダミーベクトル
+    mock_model.encode.return_value = np.array([[0.1, 0.2, 0.3, 0.4]])  # 4次元のダミーベクトル
     mock_model.get_embedding_dimension.return_value = 4
     return mock_model
 
@@ -71,9 +69,7 @@ def client(mock_embedding_model, mock_vector_store, mock_llm_model):
     # テスト用のアプリケーションを作成（lifespanなし）
     from fastapi import FastAPI
 
-    test_app = FastAPI(
-        title="テスト用ナレッジベースAPI", description="テスト用API", version="1.0.0"
-    )
+    test_app = FastAPI(title="テスト用ナレッジベースAPI", description="テスト用API", version="1.0.0")
 
     # 元のアプリからルートをコピー
     for route in app.routes:
@@ -189,9 +185,7 @@ class TestSearchEndpoint:
 class TestAddEndpoint:
     """ドキュメント追加エンドポイントのテスト"""
 
-    def test_add_document_success(
-        self, client, mock_embedding_model, mock_vector_store
-    ):
+    def test_add_document_success(self, client, mock_embedding_model, mock_vector_store):
         """正常なドキュメント追加が動作することを確認"""
         document_data = {
             "content": "新しいテストドキュメント",
@@ -258,9 +252,7 @@ class TestStatsEndpoint:
 
     def test_get_stats_index_not_found(self, client, mock_vector_store):
         """インデックスが見つからない場合のエラー処理"""
-        mock_vector_store.get_index_stats.return_value = {
-            "error": "インデックスが見つかりません"
-        }
+        mock_vector_store.get_index_stats.return_value = {"error": "インデックスが見つかりません"}
 
         response = client.get("/api/v1/stats")
         assert response.status_code == 404
@@ -291,9 +283,7 @@ class TestErrorHandling:
 class TestConversationEndpoint:
     """会話エンドポイント（RAG）のテスト"""
 
-    def test_conversation_with_rag_success(
-        self, client, mock_embedding_model, mock_vector_store, mock_llm_model
-    ):
+    def test_conversation_with_rag_success(self, client, mock_embedding_model, mock_vector_store, mock_llm_model):
         """正常なRAG会話が動作することを確認"""
         conversation_data = {
             "question": "ナレッジベースについて教えて",
@@ -321,9 +311,7 @@ class TestConversationEndpoint:
         assert data["used_knowledge"] == True
 
         # Embeddingモデルが正しく呼び出されたことを確認
-        mock_embedding_model.encode.assert_called_once_with(
-            ["ナレッジベースについて教えて"]
-        )
+        mock_embedding_model.encode.assert_called_once_with(["ナレッジベースについて教えて"])
 
         # ベクトルストアが正しく呼び出されたことを確認
         mock_vector_store.search.assert_called_once()
@@ -338,9 +326,7 @@ class TestConversationEndpoint:
         # ナレッジコンテキストが生成されていることを確認
         assert "【参考情報 1】" in call_args[1]["rag_context"]
 
-    def test_conversation_no_relevant_docs(
-        self, client, mock_vector_store, mock_llm_model
-    ):
+    def test_conversation_no_relevant_docs(self, client, mock_vector_store, mock_llm_model):
         """関連文書が見つからない場合のテスト"""
         # 空の検索結果を返すようにモックを設定
         mock_vector_store.search.return_value = []
@@ -415,16 +401,12 @@ class TestDeleteDocumentEndpoint:
         assert data["result"] == "deleted"
 
         # モックが正しく呼び出されたことを確認
-        mock_vector_store.delete_document.assert_called_once_with(
-            "knowledge-base", document_id
-        )
+        mock_vector_store.delete_document.assert_called_once_with("knowledge-base", document_id)
 
     def test_delete_document_not_found(self, client, mock_vector_store):
         """存在しないドキュメントの削除エラー処理"""
         # ドキュメントが見つからない場合をシミュレート
-        mock_vector_store.delete_document.return_value = {
-            "error": "ドキュメントが見つかりません: nonexistent_doc"
-        }
+        mock_vector_store.delete_document.return_value = {"error": "ドキュメントが見つかりません: nonexistent_doc"}
 
         document_id = "nonexistent_doc"
         response = client.delete(f"/api/v1/documents/{document_id}")
@@ -435,9 +417,7 @@ class TestDeleteDocumentEndpoint:
     def test_delete_document_server_error(self, client, mock_vector_store):
         """削除時のサーバーエラー処理"""
         # サーバーエラーをシミュレート
-        mock_vector_store.delete_document.return_value = {
-            "error": "削除エラー: サーバー内部エラー"
-        }
+        mock_vector_store.delete_document.return_value = {"error": "削除エラー: サーバー内部エラー"}
 
         document_id = "error_doc"
         response = client.delete(f"/api/v1/documents/{document_id}")
