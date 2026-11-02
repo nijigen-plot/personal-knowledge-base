@@ -201,7 +201,7 @@ def root():
         "features": {
             "embedding_model": "PlamoEmbedding (pfnet/plamo-embedding-1b) による日本語特化ベクトル化",
             "vector_search": "OpenSearch による高速類似検索とRAG（Retrieval-Augmented Generation）",
-            "ai_conversation": "OpenAI GPT-4o または Gemma 3 による自然な対話生成",
+            "ai_conversation": "OpenAI GPT-6 Luna または gpt-oss-20b による自然な対話生成",
         },
         "usage": "'/conversation' エンドポイントで質問を送信すると、関連する記録を検索し、Quarkgabberの体験として一人称で回答します。",
         "author": "Quarkgabber",
@@ -461,13 +461,24 @@ def conversation_with_rag(request: ConversationRequest, content_type: str = Depe
         query_embedding = embedding_model.encode([request.question])
 
         # 3. OpenSearchで近傍探索
+        timestamp_filter = extracted_filter.get("timestamp", None)
         search_results = vector_store.search(
             INDEX_NAME,
             query_embedding[0],
             k=request.search_k,
             tag_filter=extracted_filter.get("tag", None),
-            timestamp_filter=extracted_filter.get("timestamp", None),
+            timestamp_filter=timestamp_filter,
         )
+        # 期間で絞って0件なら、期間の判断が狭すぎた可能性があるので期間なしで探し直す
+        if not search_results and timestamp_filter:
+            logger.info("期間で絞り込んだ結果が0件だったため、期間なしで再検索します")
+            search_results = vector_store.search(
+                INDEX_NAME,
+                query_embedding[0],
+                k=request.search_k,
+                tag_filter=extracted_filter.get("tag", None),
+                timestamp_filter=None,
+            )
 
         # 4. 検索結果をナレッジコンテキストとして整形
         if search_results:

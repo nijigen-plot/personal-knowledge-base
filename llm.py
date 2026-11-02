@@ -2,7 +2,6 @@ import argparse
 import gc
 import json
 import os
-import re
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -24,6 +23,45 @@ os.environ["MALLOC_TRIM_THRESHOLD_"] = "-1"
 
 HISTORY_FILE = "history.txt"
 
+# OpenAI API の設定（.env で上書き可能）
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-6-luna")
+# gpt-6-luna / gpt-6-sol は none / low / medium(既定) / high / xhigh / max に対応。
+# none にすると推論をせず gpt-4o と同じ感覚で使え、temperature も指定できる。
+OPENAI_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT", "none")
+
+JST = timezone(timedelta(hours=9))
+
+# 検索期間を判断させるときの出力形式（Structured Outputs）。
+# 時期の指定がない質問では timestamp が null になる。
+SEARCH_PERIOD_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "search_period",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "timestamp": {
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "gte": {"type": "string", "description": "開始日 (YYYY-MM-DD)"},
+                                "lte": {"type": "string", "description": "終了日 (YYYY-MM-DD)"},
+                            },
+                            "required": ["gte", "lte"],
+                            "additionalProperties": False,
+                        },
+                        {"type": "null"},
+                    ]
+                }
+            },
+            "required": ["timestamp"],
+            "additionalProperties": False,
+        },
+    },
+}
+
 
 class LargeLanguageModel:
     def __init__(self, model_type: str = "openai-api"):
@@ -41,9 +79,7 @@ class LargeLanguageModel:
         elif model_type == "openai-20b":
             self._load_openai_20b_client()
         else:
-            raise ValueError(
-                "model_typeは'openaiapi' または'openai-20b'を指定してください"
-            )
+            raise ValueError("model_typeは'openaiapi' または'openai-20b'を指定してください")
 
     def _load_openai_20b_client(self):
         """PyTorchモデルを読み込み"""
@@ -78,9 +114,7 @@ class LargeLanguageModel:
             logger.info(f"{HISTORY_FILE} から過去の会話履歴を読み込みました。")
             return memory
         else:
-            logger.info(
-                f"{HISTORY_FILE} が存在しないため、過去の会話履歴は考慮されません。"
-            )
+            logger.info(f"{HISTORY_FILE} が存在しないため、過去の会話履歴は考慮されません。")
             return ""
 
     def _save_memory(self, message: str):
@@ -200,18 +234,13 @@ class LargeLanguageModel:
 
         # モデル生成関数のマッピング
         generators = {
-            "openai-api": lambda: self._generate_openai(
-                messages, stream, max_tokens, temperature, silent
-            ),
+            "openai-api": lambda: self._generate_openai(messages, stream, max_tokens, temperature, silent),
             "openai-20b": lambda: self._generate_pytorch(messages, max_tokens, silent),
         }
 
         generator = generators.get(self.model_type)
         if not generator:
-            raise ValueError(
-                f"未対応のmodel_type: {self.model_type}. "
-                f"対応可能: {list(generators.keys())}"
-            )
+            raise ValueError(f"未対応のmodel_type: {self.model_type}. " f"対応可能: {list(generators.keys())}")
 
         response_text = generator()
 
@@ -250,28 +279,39 @@ class LargeLanguageModel:
                     user_text += content["text"] + "\n"
                 openai_messages.append({"role": "user", "content": user_text})
 
+        # 新しいモデルは max_tokens を受け付けないので max_completion_tokens を使う。
+        # 推論をする設定（none 以外）では temperature を送るとエラーになるので外す。
+        request_params: Dict[str, Any] = {
+            "model": OPENAI_MODEL,
+            "messages": openai_messages,
+            "max_completion_tokens": max_tokens,
+            "reasoning_effort": OPENAI_REASONING_EFFORT,
+            "stream": stream,
+        }
+        if OPENAI_REASONING_EFFORT == "none":
+            request_params["temperature"] = temperature
+
         try:
-            response = self.model.chat.completions.create(
-                model="gpt-4o",
-                messages=openai_messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                stream=stream,
-            )
+            response = self.model.chat.completions.create(**request_params)
 
             if stream:
                 partial_message = ""
                 for chunk in response:
-                    if chunk.choices[0].delta.content is not None:
-                        content = chunk.choices[0].delta.content
+                    # 最後に choices が空のチャンクが来ることがあるので飛ばす
+                    if not chunk.choices:
+                        continue
+                    content = chunk.choices[0].delta.content
+                    if content:
                         if not silent:
                             print(content, end="", flush=True)
                         partial_message += content
                 if not silent:
-                    print(content)
+                    print()
                 return partial_message.strip()
             else:
-                content = response.choices[0].message.content
+                content = response.choices[0].message.content or ""
+                if not content:
+                    logger.warning(f"空の応答でした (finish_reason={response.choices[0].finish_reason})")
                 if not silent:
                     print(content)
                 return content.strip()
@@ -279,9 +319,7 @@ class LargeLanguageModel:
             logger.error(f"OpenAI API呼び出しエラー: {e}")
             return f"エラーが発生しました: {e}"
 
-    def _generate_pytorch(
-        self, messages: List[Dict[str, Any]], max_tokens: int, silent: bool = False
-    ) -> str:
+    def _generate_pytorch(self, messages: List[Dict[str, Any]], max_tokens: int, silent: bool = False) -> str:
         """PyTorch モデルでテキスト生成"""
         # messagesをchat templateで処理
         output = self.model(messages, max_new_tokens=max_tokens)
@@ -302,201 +340,90 @@ class LargeLanguageModel:
         gc.collect()
         logger.info("言語モデルのメモリ解放完了")
 
-    def _extract_timestamp_with_regex(self, text: str) -> Optional[Dict[str, str]]:
-        """正規表現を使用してタイムスタンプを抽出"""
-        now = datetime.now(timezone(timedelta(hours=9)))
-
-        # 相対的な時間表現のマッピング
-        time_patterns = {
-            r"今日|きょう": (0, "days"),
-            r"昨日|きのう": (1, "days"),
-            r"一昨日|おととい": (2, "days"),
-            r"最近|近頃": (6, "months"),
-            r"先週|前週": (7, "days"),
-            r"今週|こんしゅう": (0, "days"),
-            r"先月|前月": (30, "days"),
-            r"今月|こんげつ": (0, "days"),
-            r"去年|昨年": (365, "days"),
-            r"今年|こんねん": (0, "days"),
-            r"(\d+)日前": (None, "days"),
-            r"(\d+)週間前": (None, "weeks"),
-            r"(\d+)ヶ月前|(\d+)か月前": (None, "months"),
-            r"(\d+)年前": (None, "years"),
-        }
-
-        for pattern, (days_offset, unit) in time_patterns.items():
-            match = re.search(pattern, text)
-            if match:
-                if days_offset is None:
-                    # 数字を抽出
-                    number = int(match.group(1))
-                    if unit == "days":
-                        start_date = now - timedelta(days=number)
-                    elif unit == "weeks":
-                        start_date = now - timedelta(weeks=number)
-                    elif unit == "months":
-                        start_date = now - timedelta(days=number * 30)
-                    elif unit == "years":
-                        start_date = now - timedelta(days=number * 365)
-                else:
-                    start_date = now - timedelta(days=days_offset)
-
-                # 期間の終了時刻を設定
-                if "今日" in pattern or "きょう" in pattern:
-                    end_date = now
-                elif days_offset == 0:  # 今週、今月、今年
-                    end_date = now
-                else:
-                    end_date = now
-
-                return {
-                    "gte": start_date.strftime("%Y-%m-%dT%H:%M:%S.%f"),
-                    "lte": end_date.strftime("%Y-%m-%dT%H:%M:%S.%f"),
-                }
-
-        return None
-
-    def extract_tag(self, text: str, max_retries: int = 3) -> Dict[str, Any]:
+    def extract_tag(self, text: str, now: Optional[datetime] = None) -> Dict[str, Any]:
         """
-        文章からタグとタイムスタンプ期間を抽出
+        質問文から、記録を検索するときの期間を LLM に判断させる
 
         Args:
-            text: 解析対象の文章
-            max_retries: JSON解析失敗時のリトライ回数
+            text: 質問文
+            now: 現在時刻（テスト用。省略時は今の日本時間）
 
         Returns:
             {
-                "tag": ["lifestyle", "music", "technology"] のいずれか1個か無し。
-                "timestamp": {
-                    "gte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
-                    "lte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+                "content": "元の文章",
+                "timestamp": {  # 時期の指定がない、または判断に失敗したときはキー自体なし
+                    "gte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",  # UTC
+                    "lte": "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",  # UTC
                 },
-                "content": "元の文章がここにはいる"
             }
         """
-        # まず正規表現でタイムスタンプを抽出
-        timestamp_result = self._extract_timestamp_with_regex(text)
+        result: Dict[str, Any] = {"content": text}
+        timestamp = self._extract_timestamp_with_llm(text, now or datetime.now(JST))
+        if timestamp:
+            result["timestamp"] = timestamp
+        logger.info(f"抽出結果: {result}")
+        return result
 
-        prompt = f"""以下の文章を分析して、該当するタグを抽出してください。
+    def _extract_timestamp_with_llm(self, text: str, now: datetime) -> Optional[Dict[str, str]]:
+        """質問が指している期間を LLM に判断させる。判断できないときは None（期間で絞り込まない）"""
+        if self.model_type != "openai-api":
+            # Structured Outputs が使えるのは OpenAI API のときだけ
+            return None
 
-文章: {text}
+        weekday = "月火水木金土日"[now.weekday()]
+        prompt = f"""現在の日時は {now:%Y-%m-%d %H:%M}（{weekday}曜日、日本時間）です。
 
-抽出ルール:
-1. タグは lifestyle, music, technology のいずれか１つで、何にも該当しない場合はtagのkey valueを含めないでください。
-2. 必ず以下のJSON形式で回答してください：
+次の質問は、ある人の日記や記録を検索するために使われます。
+質問が特定の時期について尋ねている場合は、検索すべき期間を開始日と終了日（YYYY-MM-DD）で答えてください。
+「最近」「この前」のような曖昧な表現は、記録を探すうえで取りこぼしが少ない自然な範囲を判断してください。
+未来の日付は含めないでください。時期についての指定がない質問では timestamp を null にしてください。
 
-{{
-  "tag": ["ここに該当するタグを1つだけ入れてください"],
-}}
+質問: {text}"""
 
-または、該当するタグがない場合：
+        params: Dict[str, Any] = {
+            "model": OPENAI_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "reasoning_effort": OPENAI_REASONING_EFFORT,
+            "response_format": SEARCH_PERIOD_FORMAT,
+        }
+        if OPENAI_REASONING_EFFORT == "none":
+            params["temperature"] = 0
+            params["max_completion_tokens"] = 200
+        else:
+            # 推論に使うトークンも上限に含まれるので多めに取る
+            params["max_completion_tokens"] = 4000
 
-{{}}
+        try:
+            response = self.model.chat.completions.create(**params)
+            data = json.loads(response.choices[0].message.content or "")
+            return self._to_timestamp_filter(data.get("timestamp"), now)
+        except Exception as e:
+            logger.warning(f"期間の判断に失敗したため、期間で絞り込まずに検索します: {e}")
+            return None
 
-他の形式での回答は禁止されています。JSONのみ出力してください。"""
+    @staticmethod
+    def _to_timestamp_filter(period: Optional[Dict[str, str]], now: datetime) -> Optional[Dict[str, str]]:
+        """LLM が答えた日付（日本時間）を、OpenSearch の range 条件（UTC）に変換する"""
+        if not period:
+            return None
 
-        for attempt in range(max_retries):
-            try:
-                response = self.generate(
-                    prompt=prompt,
-                    use_history=False,
-                    stream=False,
-                    max_tokens=512,
-                    temperature=0.1,
-                    silent=False,
-                )
-                logger.info(f"抽出結果 (試行 {attempt + 1}/{max_retries}): {response}")
+        start_day = datetime.strptime(period["gte"], "%Y-%m-%d").date()
+        end_day = datetime.strptime(period["lte"], "%Y-%m-%d").date()
+        if start_day > end_day:
+            start_day, end_day = end_day, start_day
 
-                # JSONブロックを抽出
-                json_str = self._extract_json_from_response(response)
-                if json_str:
-                    result = json.loads(json_str)
+        start = datetime.combine(start_day, datetime.min.time(), tzinfo=JST)
+        end = datetime.combine(end_day, datetime.max.time(), tzinfo=JST)
+        if start > now:
+            return None
+        end = min(end, now)
 
-                    # 結果を組み立て
-                    final_result = {"content": text}
-
-                    # タグが含まれていれば追加→タグをつけるほどの量が今の所ないので、tagは無し
-                    # if "tag" in result:
-                    # final_result["tag"] = result["tag"]
-
-                    # 正規表現で抽出したタイムスタンプを追加
-                    if timestamp_result:
-                        final_result["timestamp"] = timestamp_result
-
-                    # バリデーション
-                    if self._validate_extraction_result(final_result):
-                        logger.info(final_result)
-                        return final_result
-
-            except (json.JSONDecodeError, KeyError, TypeError) as e:
-                logger.warning(
-                    f"JSON解析エラー (試行 {attempt + 1}/{max_retries}): {e}"
-                )
-                continue
-
-        # 3回リトライした場合はcontentと正規表現抽出結果を返す
-        final_result = {"content": text}
-        if timestamp_result:
-            final_result["timestamp"] = timestamp_result
-        return final_result
-
-    def _extract_json_from_response(self, response: str) -> Optional[str]:
-        """レスポンスからJSONを抽出"""
-        # JSONブロックを抽出
-        json_pattern = r"```json\s*(\{.*?\})\s*```"
-        match = re.search(json_pattern, response, re.DOTALL)
-        if match:
-            return match.group(1)
-
-        # 直接JSONを探す
-        json_pattern = r"(\{.*?\})"
-        match = re.search(json_pattern, response, re.DOTALL)
-        if match:
-            return match.group(1)
-
-        return None
-
-    def _validate_extraction_result(self, result: Dict[str, Any]) -> bool:
-        """抽出結果のバリデーション"""
-        if not isinstance(result, dict):
-            return False
-
-        # contentの検証（必須）
-        if "content" not in result or not isinstance(result["content"], str):
-            return False
-
-        # tagの検証（オプション）
-        if "tag" in result:
-            # tagが配列の場合は最初の要素を使用
-            if isinstance(result["tag"], list):
-                if len(result["tag"]) > 0:
-                    result["tag"] = result["tag"][0]
-                else:
-                    result["tag"] = None
-
-            # 単一の値として検証
-            if result["tag"] is not None:
-                valid_tags = {"lifestyle", "music", "technology"}
-                if result["tag"] not in valid_tags:
-                    return False
-
-        # timestampの検証（オプション）
-        if "timestamp" in result:
-            timestamp = result["timestamp"]
-            if timestamp is not None:
-                if not isinstance(timestamp, dict):
-                    return False
-
-                # gteとlteが存在する場合は文字列または null であることを確認
-                if "gte" in timestamp and timestamp["gte"] is not None:
-                    if not isinstance(timestamp["gte"], str):
-                        return False
-
-                if "lte" in timestamp and timestamp["lte"] is not None:
-                    if not isinstance(timestamp["lte"], str):
-                        return False
-
-        return True
+        # 記録は UTC で保存されているので UTC に直す
+        fmt = "%Y-%m-%dT%H:%M:%S.%f"
+        return {
+            "gte": start.astimezone(timezone.utc).strftime(fmt),
+            "lte": end.astimezone(timezone.utc).strftime(fmt),
+        }
 
     def __del__(self):
         """デストラクタでメモリ解放"""
@@ -521,18 +448,14 @@ def main():
         default="openai-api",
         help="使用するモデルタイプ (デフォルト: openai-api)",
     )
-    parser.add_argument(
-        "--no-stream", action="store_true", help="ストリーミング出力を無効化"
-    )
+    parser.add_argument("--no-stream", action="store_true", help="ストリーミング出力を無効化")
     parser.add_argument("--no-history", action="store_true", help="会話履歴を無効化")
     parser.add_argument("--max-tokens", type=int, default=512, help="最大トークン数")
-    parser.add_argument(
-        "--temperature", type=float, default=0.3, help="生成の温度パラメータ"
-    )
+    parser.add_argument("--temperature", type=float, default=0.3, help="生成の温度パラメータ")
     parser.add_argument(
         "--extract-tag",
         action="store_true",
-        help="文章からOpenSearch Filter用のタグとタイムスタンプを抽出",
+        help="質問文から検索に使う期間を LLM に判断させて表示",
     )
 
     args = parser.parse_args()
@@ -541,9 +464,8 @@ def main():
     model = LargeLanguageModel(model_type=args.model_type)
 
     if args.extract_tag:
-        model.extract_tag(
-            text=args.prompt,
-        )
+        result = model.extract_tag(text=args.prompt)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         # テキスト生成
         model.generate(

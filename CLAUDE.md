@@ -12,14 +12,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. **Embedding Layer**: PlamoEmbedding (pfnet/plamo-embedding-1b) でドキュメントのベクトル化
 2. **Vector Store**: OpenSearch でベクトル検索とフィルタリング
-3. **LLM Layer**: OpenAI GPT-4o または Gemma 3 モデルで対話生成
+3. **LLM Layer**: OpenAI GPT-6 Luna（`OPENAI_MODEL` で変更可）または gpt-oss-20b で対話生成
 4. **API Layer**: FastAPI (app.py) でRESTful APIを提供
 5. **Frontend Layer**: Streamlit (streamlit_app.py) でWebチャットインターフェース
 
 ### コンポーネント間の連携
 
 - **質問フロー**: ユーザー質問 → Embedding → OpenSearch検索 → LLMコンテキスト生成 → 回答生成
-- **タグ抽出**: `llm.py`の`extract_tag()`で質問から検索フィルタ（tag, timestamp）を自動抽出
+- **期間の判断**: `llm.py`の`extract_tag()`で、質問が指す時期を LLM が判断して検索フィルタ（timestamp）を作る
 - **メモリ管理**: 各モジュール（`embedding_model.py`, `llm.py`）が明示的なメモリ解放機能を持つ
 
 ## 開発コマンド
@@ -105,9 +105,9 @@ uv run isort .
 ### コアコンポーネント
 
 1. **llm.py** - 統合言語モデルクラス
-   - OpenAI GPT-4o API (`model_type="openai-api"`)
+   - OpenAI API (`model_type="openai-api"`、既定は `gpt-6-luna` + `reasoning_effort=none`)
    - ローカルモデル (`model_type="openai-20b"`) - `./gpt-oss-20b`モデル使用
-   - 会話履歴管理 (`history.txt`) とタグ・タイムスタンプ抽出機能
+   - 会話履歴管理 (`history.txt`) と LLM による検索期間の判断（Structured Outputs）
    - RAGコンテキスト統合と一人称回答生成
 
 2. **embedding_model.py** - ベクトル化エンジン
@@ -220,7 +220,7 @@ OPENSEARCH_DASHBOARD_PORT=5601
 
 ### パフォーマンス特性
 - **Gemma 3 1B/4B**: ローカル推論可能だがRAG能力限定
-- **OpenAI GPT-4o**: RAG統合と一人称回答に最適（現在のデフォルト）
+- **OpenAI GPT-6 Luna**: RAG統合と一人称回答（現在のデフォルト。速くて安い。質を上げたいときは `.env` に `OPENAI_MODEL=gpt-6-sol`）
 - **PlamoEmbedding**: 日本語ベクトル化に特化
 
 ### デバッグとモニタリング
@@ -249,9 +249,9 @@ response = requests.post(
 )
 ```
 
-### タグ自動分類システム
-- LLM が質問から `lifestyle|music|technology` タグを抽出
-- 正規表現ベースのタイムスタンプ抽出（「最近」「昨日」「3日前」等）
+### 検索期間の判断
+- LLM による検索期間の判断（「最近」「先月」「この前」等の解釈を LLM に任せる。日本時間で判断し UTC に変換）
+- 期間で絞って0件なら、期間なしで再検索
 - `extract_tag()` でフィルタ条件の自動生成
 
 ## 重要な設計原則
