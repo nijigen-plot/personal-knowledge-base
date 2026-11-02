@@ -37,7 +37,7 @@ def make_chunk(content):
 
 class TestGenerateOpenAI:
     def test_uses_new_parameters(self, openai_llm, monkeypatch):
-        monkeypatch.setattr(llm, "OPENAI_MODEL", "gpt-6-sol")
+        monkeypatch.setattr(llm, "OPENAI_MODEL", "gpt-6-luna")
         monkeypatch.setattr(llm, "OPENAI_REASONING_EFFORT", "none")
         openai_llm.model.chat.completions.create.return_value = make_response("回答")
 
@@ -45,7 +45,7 @@ class TestGenerateOpenAI:
 
         assert result == "回答"
         params = openai_llm.model.chat.completions.create.call_args.kwargs
-        assert params["model"] == "gpt-6-sol"
+        assert params["model"] == "gpt-6-luna"
         assert params["max_completion_tokens"] == 512
         assert "max_tokens" not in params
         assert params["reasoning_effort"] == "none"

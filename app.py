@@ -201,7 +201,7 @@ def root():
         "features": {
             "embedding_model": "PlamoEmbedding (pfnet/plamo-embedding-1b) による日本語特化ベクトル化",
             "vector_search": "OpenSearch による高速類似検索とRAG（Retrieval-Augmented Generation）",
-            "ai_conversation": "OpenAI GPT-6 Sol または gpt-oss-20b による自然な対話生成",
+            "ai_conversation": "OpenAI GPT-6 Luna または gpt-oss-20b による自然な対話生成",
         },
         "usage": "'/conversation' エンドポイントで質問を送信すると、関連する記録を検索し、Quarkgabberの体験として一人称で回答します。",
         "author": "Quarkgabber",

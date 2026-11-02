@@ -24,8 +24,8 @@ os.environ["MALLOC_TRIM_THRESHOLD_"] = "-1"
 HISTORY_FILE = "history.txt"
 
 # OpenAI API の設定（.env で上書き可能）
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-6-sol")
-# gpt-6-sol は none / low / medium(既定) / high / xhigh / max に対応。
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-6-luna")
+# gpt-6-luna / gpt-6-sol は none / low / medium(既定) / high / xhigh / max に対応。
 # none にすると推論をせず gpt-4o と同じ感覚で使え、temperature も指定できる。
 OPENAI_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT", "none")
 
