@@ -345,6 +345,27 @@ class TestConversationEndpoint:
         call_args = mock_llm_model.generate.call_args
         assert call_args[1]["rag_context"] is None
 
+    def test_conversation_retries_without_timestamp_filter(self, client, mock_vector_store, mock_llm_model):
+        """期間で絞って0件なら、期間なしで検索し直すことを確認"""
+        timestamp = {"gte": "2026-10-01T00:00:00.000000", "lte": "2026-10-31T00:00:00.000000"}
+        mock_llm_model.extract_tag.return_value = {"content": "先月どうだった？", "timestamp": timestamp}
+        hit = {
+            "id": "old_doc",
+            "score": 0.8,
+            "content": "古い記録",
+            "tag": "music",
+            "timestamp": "2025-01-01 09:00:00+09:00",
+        }
+        mock_vector_store.search.side_effect = [[], [hit]]
+
+        response = client.post("/api/v1/conversation", json={"question": "先月どうだった？"})
+
+        assert response.status_code == 200
+        assert response.json()["search_count"] == 1
+        assert mock_vector_store.search.call_count == 2
+        assert mock_vector_store.search.call_args_list[0].kwargs["timestamp_filter"] == timestamp
+        assert mock_vector_store.search.call_args_list[1].kwargs["timestamp_filter"] is None
+
     def test_conversation_minimal_request(self, client):
         """最小限のリクエストで会話をテスト"""
         conversation_data = {"question": "テスト質問"}

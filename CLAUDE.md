@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### コンポーネント間の連携
 
 - **質問フロー**: ユーザー質問 → Embedding → OpenSearch検索 → LLMコンテキスト生成 → 回答生成
-- **タグ抽出**: `llm.py`の`extract_tag()`で質問から検索フィルタ（tag, timestamp）を自動抽出
+- **期間の判断**: `llm.py`の`extract_tag()`で、質問が指す時期を LLM が判断して検索フィルタ（timestamp）を作る
 - **メモリ管理**: 各モジュール（`embedding_model.py`, `llm.py`）が明示的なメモリ解放機能を持つ
 
 ## 開発コマンド
@@ -107,7 +107,7 @@ uv run isort .
 1. **llm.py** - 統合言語モデルクラス
    - OpenAI API (`model_type="openai-api"`、既定は `gpt-6-sol` + `reasoning_effort=none`)
    - ローカルモデル (`model_type="openai-20b"`) - `./gpt-oss-20b`モデル使用
-   - 会話履歴管理 (`history.txt`) とタグ・タイムスタンプ抽出機能
+   - 会話履歴管理 (`history.txt`) と LLM による検索期間の判断（Structured Outputs）
    - RAGコンテキスト統合と一人称回答生成
 
 2. **embedding_model.py** - ベクトル化エンジン
@@ -249,9 +249,9 @@ response = requests.post(
 )
 ```
 
-### タグ自動分類システム
-- LLM が質問から `lifestyle|music|technology` タグを抽出
-- 正規表現ベースのタイムスタンプ抽出（「最近」「昨日」「3日前」等）
+### 検索期間の判断
+- LLM による検索期間の判断（「最近」「先月」「この前」等の解釈を LLM に任せる。日本時間で判断し UTC に変換）
+- 期間で絞って0件なら、期間なしで再検索
 - `extract_tag()` でフィルタ条件の自動生成
 
 ## 重要な設計原則

@@ -461,13 +461,24 @@ def conversation_with_rag(request: ConversationRequest, content_type: str = Depe
         query_embedding = embedding_model.encode([request.question])
 
         # 3. OpenSearchで近傍探索
+        timestamp_filter = extracted_filter.get("timestamp", None)
         search_results = vector_store.search(
             INDEX_NAME,
             query_embedding[0],
             k=request.search_k,
             tag_filter=extracted_filter.get("tag", None),
-            timestamp_filter=extracted_filter.get("timestamp", None),
+            timestamp_filter=timestamp_filter,
         )
+        # 期間で絞って0件なら、期間の判断が狭すぎた可能性があるので期間なしで探し直す
+        if not search_results and timestamp_filter:
+            logger.info("期間で絞り込んだ結果が0件だったため、期間なしで再検索します")
+            search_results = vector_store.search(
+                INDEX_NAME,
+                query_embedding[0],
+                k=request.search_k,
+                tag_filter=extracted_filter.get("tag", None),
+                timestamp_filter=None,
+            )
 
         # 4. 検索結果をナレッジコンテキストとして整形
         if search_results:
