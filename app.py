@@ -18,6 +18,8 @@ from llm import LargeLanguageModel
 from log_config import get_logger
 from opensearch_client import OpenSearchVectorStore
 
+##
+##
 load_dotenv(".env")
 
 logger = get_logger(__name__)
@@ -34,6 +36,9 @@ class SearchRequest(BaseModel):
     k: Optional[int] = 10
     tag_filter: Optional[Literal["lifestyle", "music", "technology"]] = None
     timestamp_filter: Optional[dict[str, str]] = None
+
+
+##
 
 
 class SearchResult(BaseModel):
